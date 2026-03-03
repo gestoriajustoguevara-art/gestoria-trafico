@@ -222,18 +222,25 @@ function guardarCliente(event) {
         const index = clientes.findIndex(c => c.id === clienteEditandoId);
         if (index !== -1) {
             clientes[index] = cliente;
-            mostrarAlerta('✅ Cliente actualizado correctamente', 'success');
+            mostrarAlerta('✅ Cliente actualizado. Subiendo a Google Sheets...', 'success');
         }
         clienteEditandoId = null;
     } else {
         clientes.push(cliente);
-        mostrarAlerta('✅ Cliente guardado correctamente', 'success');
+        mostrarAlerta('✅ Cliente guardado. Subiendo a Google Sheets...', 'success');
     }
     
     guardarDatos();
     ocultarFormularioCliente();
     cargarTablaClientes();
     actualizarDashboard();
+    
+    // Subir automáticamente a Google Sheets
+    subirAGoogleSheets().then(() => {
+        console.log('✓ Clientes sincronizados con Google Sheets');
+    }).catch(err => {
+        console.error('Error al sincronizar clientes:', err);
+    });
 }
 
 // Función para mostrar/ocultar campos según el tipo de cliente
@@ -353,7 +360,14 @@ function eliminarCliente(id) {
         guardarDatos();
         cargarTablaClientes();
         actualizarDashboard();
-        mostrarAlerta('Cliente eliminado correctamente', 'success');
+        mostrarAlerta('Cliente eliminado. Sincronizando...', 'success');
+        
+        // Subir automáticamente a Google Sheets
+        subirAGoogleSheets().then(() => {
+            console.log('✓ Eliminación sincronizada con Google Sheets');
+        }).catch(err => {
+            console.error('Error al sincronizar eliminación:', err);
+        });
     }
 }
 
@@ -390,18 +404,25 @@ function guardarVehiculo(event) {
         const index = vehiculos.findIndex(v => v.id === vehiculoEditandoId);
         if (index !== -1) {
             vehiculos[index] = vehiculo;
-            mostrarAlerta('✅ Vehículo actualizado correctamente', 'success');
+            mostrarAlerta('✅ Vehículo actualizado. Subiendo a Google Sheets...', 'success');
         }
         vehiculoEditandoId = null;
     } else {
         vehiculos.push(vehiculo);
-        mostrarAlerta('✅ Vehículo guardado correctamente', 'success');
+        mostrarAlerta('✅ Vehículo guardado. Subiendo a Google Sheets...', 'success');
     }
     
     guardarDatos();
     ocultarFormularioVehiculo();
     cargarTablaVehiculos();
     actualizarDashboard();
+    
+    // Subir automáticamente a Google Sheets
+    subirAGoogleSheets().then(() => {
+        console.log('✓ Vehículos sincronizados con Google Sheets');
+    }).catch(err => {
+        console.error('Error al sincronizar vehículos:', err);
+    });
 }
 
 function cargarTablaVehiculos() {
@@ -477,7 +498,14 @@ function eliminarVehiculo(id) {
         guardarDatos();
         cargarTablaVehiculos();
         actualizarDashboard();
-        mostrarAlerta('Vehículo eliminado correctamente', 'success');
+        mostrarAlerta('Vehículo eliminado. Sincronizando...', 'success');
+        
+        // Subir automáticamente a Google Sheets
+        subirAGoogleSheets().then(() => {
+            console.log('✓ Eliminación sincronizada con Google Sheets');
+        }).catch(err => {
+            console.error('Error al sincronizar eliminación:', err);
+        });
     }
 }
 
@@ -688,10 +716,17 @@ function guardarExpediente(event) {
     
     console.log('Expediente guardado. Total expedientes:', expedientes.length);
     
-    mostrarAlerta(`✅ Expediente ${expediente.numero} creado correctamente`, 'success');
+    mostrarAlerta(`✅ Expediente ${expediente.numero} creado correctamente. Subiendo a Google Sheets...`, 'success');
     limpiarFormularioExpediente();
     actualizarDashboard();
     cargarTablaExpedientes();
+    
+    // Subir automáticamente a Google Sheets
+    subirAGoogleSheets().then(() => {
+        console.log('✓ Datos sincronizados con Google Sheets');
+    }).catch(err => {
+        console.error('Error al sincronizar:', err);
+    });
     
     // Cambiar a la pestaña de expedientes después de 1 segundo
     setTimeout(() => {
@@ -920,7 +955,14 @@ function eliminarExpediente(id) {
         guardarDatos();
         cargarTablaExpedientes();
         actualizarDashboard();
-        mostrarAlerta('Expediente eliminado correctamente', 'success');
+        mostrarAlerta('Expediente eliminado. Sincronizando...', 'success');
+        
+        // Subir automáticamente a Google Sheets
+        subirAGoogleSheets().then(() => {
+            console.log('✓ Eliminación sincronizada con Google Sheets');
+        }).catch(err => {
+            console.error('Error al sincronizar eliminación:', err);
+        });
     }
 }
 
