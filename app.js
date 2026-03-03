@@ -71,7 +71,12 @@ function switchTab(tabName) {
 function actualizarDashboard() {
     document.getElementById('total-clientes').textContent = clientes.length;
     document.getElementById('total-vehiculos').textContent = vehiculos.length;
-    document.getElementById('total-expedientes').textContent = expedientes.length;
+    
+    // Contar expedientes pendientes (no finalizados ni recogidos)
+    const expedientesPendientes = expedientes.filter(exp => 
+        exp.estado !== 'finalizado' && exp.estado !== 'recogido'
+    ).length;
+    document.getElementById('total-expedientes').textContent = expedientesPendientes;
     
     // Contar expedientes del mes actual
     const ahora = new Date();
@@ -124,12 +129,15 @@ function actualizarDashboard() {
             const vehiculo = vehiculos.find(v => v.id === exp.vehiculo);
             const matricula = vehiculo ? vehiculo.matricula : 'N/A';
             
+            // Obtener estado
+            const estadoInfo = obtenerEstiloEstado(exp.estado);
+            
             tr.innerHTML = `
                 <td><strong>${exp.numero}</strong></td>
                 <td><span class="expediente-badge ${badgeClass}">${exp.tipo.toUpperCase()}</span></td>
                 <td>${nombreCliente}</td>
                 <td>${matricula}</td>
-                <td>${formatearFecha(exp.fecha)}</td>
+                <td><span style="${estadoInfo.estilo}" onclick="cambiarEstadoExpediente('${exp.id}')">${estadoInfo.texto}</span></td>
                 <td>
                     <div class="action-buttons">
                         <button class="action-btn btn-primary" onclick="verExpediente('${exp.id}')">Ver</button>
@@ -811,13 +819,16 @@ function cargarTablaExpedientes() {
             matricula = vehiculo ? vehiculo.matricula : 'N/A';
         }
         
+        // Obtener estado con estilo
+        const estadoInfo = obtenerEstiloEstado(exp.estado);
+        
         tr.innerHTML = `
             <td><strong>${exp.numero}</strong></td>
             <td><span class="expediente-badge ${badgeClass}">${exp.tipo.toUpperCase()}</span></td>
             <td>${nombreCliente}</td>
             <td>${matricula}</td>
             <td>${formatearFecha(exp.fecha)}</td>
-            <td><span style="color: green;">✓ Activo</span></td>
+            <td><span style="${estadoInfo.estilo}" onclick="cambiarEstadoExpediente('${exp.id}')" title="Clic para cambiar estado">${estadoInfo.texto}</span></td>
             <td>
                 <div class="action-buttons">
                     <button class="action-btn btn-primary" onclick="verExpediente('${exp.id}')">Ver</button>
@@ -899,13 +910,16 @@ function buscarExpedientes() {
             matricula = vehiculo ? vehiculo.matricula : 'N/A';
         }
         
+        // Obtener estado con estilo
+        const estadoInfo = obtenerEstiloEstado(exp.estado);
+        
         tr.innerHTML = `
             <td><strong>${exp.numero}</strong></td>
             <td><span class="expediente-badge ${badgeClass}">${exp.tipo.toUpperCase()}</span></td>
             <td>${nombreCliente}</td>
             <td>${matricula}</td>
             <td>${formatearFecha(exp.fecha)}</td>
-            <td><span style="color: green;">✓ Activo</span></td>
+            <td><span style="${estadoInfo.estilo}" onclick="cambiarEstadoExpediente('${exp.id}')" title="Clic para cambiar estado">${estadoInfo.texto}</span></td>
             <td>
                 <div class="action-buttons">
                     <button class="action-btn btn-primary" onclick="verExpediente('${exp.id}')">Ver</button>
@@ -963,6 +977,68 @@ function eliminarExpediente(id) {
         }).catch(err => {
             console.error('Error al sincronizar eliminación:', err);
         });
+    }
+}
+
+// Lista de estados posibles para expedientes
+const ESTADOS_EXPEDIENTE = [
+    { valor: 'pendiente_doc', texto: '📋 Pendiente Doc', color: '#ff9800' },
+    { valor: 'enviado_ctit', texto: '📤 Enviado CTIT', color: '#2196f3' },
+    { valor: 'envio_pdf', texto: '📄 Envío PDF', color: '#9c27b0' },
+    { valor: 'remesado', texto: '💰 Remesado', color: '#00bcd4' },
+    { valor: 'finalizado', texto: '✅ Finalizado', color: '#4caf50' },
+    { valor: 'recogido', texto: '📦 Recogido', color: '#8bc34a' },
+    { valor: 'con_defectos', texto: '⚠️ Con Defectos', color: '#f44336' }
+];
+
+// Obtener estilo y texto del estado
+function obtenerEstiloEstado(estado) {
+    const estadoEncontrado = ESTADOS_EXPEDIENTE.find(e => e.valor === estado);
+    
+    if (estadoEncontrado) {
+        return {
+            texto: estadoEncontrado.texto,
+            estilo: `color: white; background-color: ${estadoEncontrado.color}; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 12px;`
+        };
+    }
+    
+    // Estado por defecto (pendiente_doc)
+    return {
+        texto: '📋 Pendiente Doc',
+        estilo: 'color: white; background-color: #ff9800; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 12px;'
+    };
+}
+
+// Cambiar estado de un expediente
+function cambiarEstadoExpediente(id) {
+    const expediente = expedientes.find(e => e.id === id);
+    if (!expediente) return;
+    
+    // Crear lista de opciones
+    let opciones = ESTADOS_EXPEDIENTE.map((e, i) => `${i + 1} - ${e.texto}`).join('\n');
+    
+    const seleccion = prompt(
+        `Cambiar estado del expediente ${expediente.numero}\n\nEstado actual: ${obtenerEstiloEstado(expediente.estado).texto}\n\nSelecciona nuevo estado:\n\n${opciones}\n\nEscribe el número:`
+    );
+    
+    if (seleccion) {
+        const indice = parseInt(seleccion) - 1;
+        if (indice >= 0 && indice < ESTADOS_EXPEDIENTE.length) {
+            expediente.estado = ESTADOS_EXPEDIENTE[indice].valor;
+            guardarDatos();
+            cargarTablaExpedientes();
+            actualizarDashboard();
+            mostrarAlerta(`Estado cambiado a: ${ESTADOS_EXPEDIENTE[indice].texto}`, 'success');
+            
+            // Subir automáticamente a Google Sheets
+            subirAGoogleSheets().then(() => {
+                console.log('✓ Estado sincronizado con Google Sheets');
+            }).catch(err => {
+                console.error('Error al sincronizar estado:', err);
+            });
+        } else {
+            mostrarAlerta('Opción no válida', 'error');
+        }
     }
 }
 
