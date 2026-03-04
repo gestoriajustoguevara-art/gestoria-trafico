@@ -317,7 +317,7 @@ function cargarTablaClientes() {
             <td>
                 <div class="action-buttons">
                     <button class="action-btn btn-primary" onclick="editarCliente('${cliente.id}')">Editar</button>
-                    <button class="action-btn btn-danger" onclick="eliminarCliente('${cliente.id}')">Eliminar</button>
+                    <button class="action-btn btn-danger" onclick="eliminarCliente('${cliente.id}')">✏️ Modificar</button>
                 </div>
             </td>
         `;
@@ -354,7 +354,7 @@ function buscarClientes() {
             <td>
                 <div class="action-buttons">
                     <button class="action-btn btn-primary" onclick="editarCliente('${cliente.id}')">Editar</button>
-                    <button class="action-btn btn-danger" onclick="eliminarCliente('${cliente.id}')">Eliminar</button>
+                    <button class="action-btn btn-danger" onclick="eliminarCliente('${cliente.id}')">✏️ Modificar</button>
                 </div>
             </td>
         `;
@@ -455,7 +455,7 @@ function cargarTablaVehiculos() {
             <td>
                 <div class="action-buttons">
                     <button class="action-btn btn-primary" onclick="editarVehiculo('${vehiculo.id}')">Editar</button>
-                    <button class="action-btn btn-danger" onclick="eliminarVehiculo('${vehiculo.id}')">Eliminar</button>
+                    <button class="action-btn btn-danger" onclick="eliminarVehiculo('${vehiculo.id}')">✏️ Modificar</button>
                 </div>
             </td>
         `;
@@ -492,7 +492,7 @@ function buscarVehiculos() {
             <td>
                 <div class="action-buttons">
                     <button class="action-btn btn-primary" onclick="editarVehiculo('${vehiculo.id}')">Editar</button>
-                    <button class="action-btn btn-danger" onclick="eliminarVehiculo('${vehiculo.id}')">Eliminar</button>
+                    <button class="action-btn btn-danger" onclick="eliminarVehiculo('${vehiculo.id}')">✏️ Modificar</button>
                 </div>
             </td>
         `;
@@ -731,12 +731,27 @@ function guardarExpediente(event) {
     
     console.log('Expediente a guardar:', expediente);
     
-    expedientes.push(expediente);
+    // Si estamos editando, actualizar; si no, añadir nuevo
+    if (expedienteEditandoId) {
+        const index = expedientes.findIndex(e => e.id === expedienteEditandoId);
+        if (index !== -1) {
+            // Mantener el ID y número original
+            expediente.id = expedienteEditandoId;
+            expediente.numero = expedientes[index].numero;
+            expediente.fecha = expedientes[index].fecha; // Mantener fecha original
+            expedientes[index] = expediente;
+            mostrarAlerta(`✅ Expediente ${expediente.numero} actualizado. Subiendo a Google Sheets...`, 'success');
+        }
+        expedienteEditandoId = null;
+    } else {
+        expedientes.push(expediente);
+        mostrarAlerta(`✅ Expediente ${expediente.numero} creado correctamente. Subiendo a Google Sheets...`, 'success');
+    }
+    
     guardarDatos();
     
     console.log('Expediente guardado. Total expedientes:', expedientes.length);
     
-    mostrarAlerta(`✅ Expediente ${expediente.numero} creado correctamente. Subiendo a Google Sheets...`, 'success');
     limpiarFormularioExpediente();
     actualizarDashboard();
     cargarTablaExpedientes();
@@ -846,7 +861,7 @@ function cargarTablaExpedientes() {
                     <button class="action-btn btn-primary" onclick="verExpediente('${exp.id}')">Ver</button>
                     <button class="action-btn btn-success" onclick="exportarAHermes('${exp.id}')">📤 Hermes</button>
                     <button class="action-btn btn-success" onclick="generarPDF('${exp.id}')">PDF</button>
-                    <button class="action-btn btn-danger" onclick="eliminarExpediente('${exp.id}')">Eliminar</button>
+                    <button class="action-btn btn-warning" onclick="modificarExpediente" style="background: #ff9800; color: white;('${exp.id}')">✏️ Modificar</button>
                 </div>
             </td>
         `;
@@ -937,7 +952,7 @@ function buscarExpedientes() {
                     <button class="action-btn btn-primary" onclick="verExpediente('${exp.id}')">Ver</button>
                     <button class="action-btn btn-success" onclick="exportarAHermes('${exp.id}')">📤 Hermes</button>
                     <button class="action-btn btn-success" onclick="generarPDF('${exp.id}')">PDF</button>
-                    <button class="action-btn btn-danger" onclick="eliminarExpediente('${exp.id}')">Eliminar</button>
+                    <button class="action-btn btn-warning" onclick="modificarExpediente" style="background: #ff9800; color: white;('${exp.id}')">✏️ Modificar</button>
                 </div>
             </td>
         `;
@@ -975,21 +990,72 @@ function verExpediente(id) {
     alert(detalles);
 }
 
-function eliminarExpediente(id) {
-    if (confirm('¿Estás seguro de que quieres eliminar este expediente?')) {
-        expedientes = expedientes.filter(e => e.id !== id);
-        guardarDatos();
-        cargarTablaExpedientes();
-        actualizarDashboard();
-        mostrarAlerta('Expediente eliminado. Sincronizando...', 'success');
-        
-        // Subir automáticamente a Google Sheets
-        subirAGoogleSheets().then(() => {
-            console.log('✓ Eliminación sincronizada con Google Sheets');
-        }).catch(err => {
-            console.error('Error al sincronizar eliminación:', err);
-        });
+// Variable para guardar el ID del expediente que se está editando
+let expedienteEditandoId = null;
+
+function modificarExpediente(id) {
+    const expediente = expedientes.find(e => e.id === id);
+    if (!expediente) {
+        mostrarAlerta('No se encontró el expediente', 'error');
+        return;
     }
+    
+    expedienteEditandoId = id;
+    
+    // Cambiar a la pestaña de nuevo expediente
+    document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+    document.querySelectorAll('.nav-tab').forEach(btn => btn.classList.remove('active'));
+    document.getElementById('nuevo-expediente').classList.add('active');
+    document.querySelectorAll('.nav-tab')[4].classList.add('active');
+    
+    // Cargar el tipo de expediente
+    document.getElementById('expediente-tipo').value = expediente.tipo;
+    mostrarCamposExpediente();
+    
+    // Cargar datos según el tipo
+    if (expediente.tipo === 'transferencia') {
+        document.getElementById('exp-vehiculo').value = expediente.vehiculo || '';
+        document.getElementById('exp-vendedor').value = expediente.vendedor || '';
+        document.getElementById('exp-comprador').value = expediente.comprador || '';
+        document.getElementById('exp-precio').value = expediente.precio || '';
+        document.getElementById('exp-fecha-operacion').value = expediente.fechaOperacion || '';
+        document.getElementById('exp-hora').value = expediente.hora || '';
+        document.getElementById('exp-lugar').value = expediente.lugar || '';
+    } else if (expediente.tipo === 'matriculacion') {
+        document.getElementById('exp-titular-mat').value = expediente.titular || '';
+        document.getElementById('exp-vehiculo-mat').value = expediente.vehiculo || '';
+    } else if (expediente.tipo === 'baja') {
+        document.getElementById('exp-vehiculo-baja').value = expediente.vehiculo || '';
+        document.getElementById('exp-titular-baja').value = expediente.titular || '';
+        document.getElementById('exp-motivo-baja').value = expediente.motivoBaja || '';
+    } else if (expediente.tipo === 'duplicado') {
+        document.getElementById('exp-vehiculo-dup').value = expediente.vehiculo || '';
+        document.getElementById('exp-titular-dup').value = expediente.titular || '';
+        document.getElementById('exp-doc-duplicar').value = expediente.documentoDuplicar || '';
+    } else if (expediente.tipo === 'canje') {
+        document.getElementById('exp-titular-canje').value = expediente.titular || expediente.comprador || '';
+        document.getElementById('exp-canje-origen').value = expediente.origen || '';
+        document.getElementById('exp-canje-pais').value = expediente.pais || '';
+        document.getElementById('exp-canje-clase').value = expediente.clasePermiso || '';
+        document.getElementById('exp-canje-numero').value = expediente.numeroPermiso || '';
+        document.getElementById('exp-canje-fecha-exp').value = expediente.fechaExpedicion || '';
+        document.getElementById('exp-canje-fecha-cad').value = expediente.fechaCaducidad || '';
+        document.getElementById('exp-canje-localizador').value = expediente.localizadorDGT || '';
+        document.getElementById('exp-canje-colegio').value = expediente.recogerColegio || '';
+    }
+    
+    // Cargar datos económicos
+    document.getElementById('exp-tasa-trafico').value = expediente.tasaTrafico || 0;
+    document.getElementById('exp-impuesto').value = expediente.impuesto || 0;
+    document.getElementById('exp-honorarios').value = expediente.honorarios || 0;
+    document.getElementById('exp-pago-cliente').value = expediente.pagoCliente || 0;
+    document.getElementById('exp-es-empresa').checked = expediente.esEmpresa || false;
+    calcularTotales();
+    
+    // Cargar observaciones
+    document.getElementById('exp-observaciones').value = expediente.observaciones || '';
+    
+    mostrarAlerta(`Editando expediente ${expediente.numero}`, 'success');
 }
 
 // Lista de estados posibles para expedientes
@@ -1643,7 +1709,50 @@ async function subirAGoogleSheets() {
         await subirHoja('Expedientes', expedientesParaSheets, [
             'id', 'numero', 'fecha', 'tipo', 'estado',
             'vendedor', 'nombreVendedor', 'comprador', 'nombreComprador', 'vehiculo', 'matriculaVehiculo',
-            'precio', 'observaciones'
+            'precio', 'observaciones',
+            'tasaTrafico', 'impuesto', 'honorarios', 'ivaHonorarios', 'totalSuplidos', 'totalFactura', 
+            'pagoCliente', 'difHonorarios', 'esEmpresa', 'retencion'
+        ]);
+        
+        // Subir hoja de FACTURACIÓN con todos los datos económicos
+        const facturacion = expedientes.map(exp => {
+            // Buscar nombre del cliente
+            const idCliente = exp.comprador || exp.titular || '';
+            const cliente = clientes.find(c => c.id == idCliente);
+            let nombreCliente = '';
+            if (cliente) {
+                if (cliente.tipoCliente === 'juridica') {
+                    nombreCliente = cliente.nombre || '';
+                } else {
+                    nombreCliente = `${cliente.nombre || ''} ${cliente.apellido1 || ''} ${cliente.apellido2 || ''}`.trim();
+                }
+            }
+            
+            return {
+                id: exp.id,
+                numero: exp.numero,
+                fecha: exp.fecha,
+                tipo: exp.tipo,
+                estado: exp.estado,
+                cliente: nombreCliente,
+                tasaTrafico: exp.tasaTrafico || 0,
+                impuesto: exp.impuesto || 0,
+                honorarios: exp.honorarios || 0,
+                ivaHonorarios: exp.ivaHonorarios || 0,
+                totalSuplidos: exp.totalSuplidos || 0,
+                totalFactura: exp.totalFactura || 0,
+                pagoCliente: exp.pagoCliente || 0,
+                difHonorarios: exp.difHonorarios || 0,
+                esEmpresa: exp.esEmpresa ? 'SÍ' : 'NO',
+                retencion: exp.retencion || 0
+            };
+        });
+        
+        await subirHoja('Facturacion', facturacion, [
+            'id', 'numero', 'fecha', 'tipo', 'estado', 'cliente',
+            'tasaTrafico', 'impuesto', 'honorarios', 'ivaHonorarios', 
+            'totalSuplidos', 'totalFactura', 'pagoCliente', 'difHonorarios', 
+            'esEmpresa', 'retencion'
         ]);
         
         // Subir hojas específicas por tipo de trámite
