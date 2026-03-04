@@ -994,12 +994,15 @@ function verExpediente(id) {
 let expedienteEditandoId = null;
 
 function modificarExpediente(id) {
-    const expediente = expedientes.find(e => e.id === id);
+    console.log('Modificando expediente con ID:', id);
+    const expediente = expedientes.find(e => e.id == id);
     if (!expediente) {
         mostrarAlerta('No se encontró el expediente', 'error');
+        console.log('Expedientes disponibles:', expedientes.map(e => e.id));
         return;
     }
     
+    console.log('Expediente encontrado:', expediente);
     expedienteEditandoId = id;
     
     // Cambiar a la pestaña de nuevo expediente
@@ -1010,52 +1013,59 @@ function modificarExpediente(id) {
     
     // Cargar el tipo de expediente
     document.getElementById('expediente-tipo').value = expediente.tipo;
-    mostrarCamposExpediente();
+    mostrarCamposExpedienteOriginal(); // Usar la función original para no disparar tarifas
     
     // Cargar datos según el tipo
-    if (expediente.tipo === 'transferencia') {
-        document.getElementById('exp-vehiculo').value = expediente.vehiculo || '';
-        document.getElementById('exp-vendedor').value = expediente.vendedor || '';
-        document.getElementById('exp-comprador').value = expediente.comprador || '';
-        document.getElementById('exp-precio').value = expediente.precio || '';
-        document.getElementById('exp-fecha-operacion').value = expediente.fechaOperacion || '';
-        document.getElementById('exp-hora').value = expediente.hora || '';
-        document.getElementById('exp-lugar').value = expediente.lugar || '';
-    } else if (expediente.tipo === 'matriculacion') {
-        document.getElementById('exp-titular-mat').value = expediente.titular || '';
-        document.getElementById('exp-vehiculo-mat').value = expediente.vehiculo || '';
-    } else if (expediente.tipo === 'baja') {
-        document.getElementById('exp-vehiculo-baja').value = expediente.vehiculo || '';
-        document.getElementById('exp-titular-baja').value = expediente.titular || '';
-        document.getElementById('exp-motivo-baja').value = expediente.motivoBaja || '';
-    } else if (expediente.tipo === 'duplicado') {
-        document.getElementById('exp-vehiculo-dup').value = expediente.vehiculo || '';
-        document.getElementById('exp-titular-dup').value = expediente.titular || '';
-        document.getElementById('exp-doc-duplicar').value = expediente.documentoDuplicar || '';
-    } else if (expediente.tipo === 'canje') {
-        document.getElementById('exp-titular-canje').value = expediente.titular || expediente.comprador || '';
-        document.getElementById('exp-canje-origen').value = expediente.origen || '';
-        document.getElementById('exp-canje-pais').value = expediente.pais || '';
-        document.getElementById('exp-canje-clase').value = expediente.clasePermiso || '';
-        document.getElementById('exp-canje-numero').value = expediente.numeroPermiso || '';
-        document.getElementById('exp-canje-fecha-exp').value = expediente.fechaExpedicion || '';
-        document.getElementById('exp-canje-fecha-cad').value = expediente.fechaCaducidad || '';
-        document.getElementById('exp-canje-localizador').value = expediente.localizadorDGT || '';
-        document.getElementById('exp-canje-colegio').value = expediente.recogerColegio || '';
-    }
-    
-    // Cargar datos económicos
-    document.getElementById('exp-tasa-trafico').value = expediente.tasaTrafico || 0;
-    document.getElementById('exp-impuesto').value = expediente.impuesto || 0;
-    document.getElementById('exp-honorarios').value = expediente.honorarios || 0;
-    document.getElementById('exp-pago-cliente').value = expediente.pagoCliente || 0;
-    document.getElementById('exp-es-empresa').checked = expediente.esEmpresa || false;
-    calcularTotales();
-    
-    // Cargar observaciones
-    document.getElementById('exp-observaciones').value = expediente.observaciones || '';
-    
-    mostrarAlerta(`Editando expediente ${expediente.numero}`, 'success');
+    setTimeout(() => {
+        if (expediente.tipo === 'transferencia') {
+            if (document.getElementById('exp-vehiculo')) document.getElementById('exp-vehiculo').value = expediente.vehiculo || '';
+            if (document.getElementById('exp-vendedor')) document.getElementById('exp-vendedor').value = expediente.vendedor || '';
+            if (document.getElementById('exp-comprador')) document.getElementById('exp-comprador').value = expediente.comprador || '';
+            if (document.getElementById('exp-precio')) document.getElementById('exp-precio').value = expediente.precio || '';
+            if (document.getElementById('exp-fecha-operacion')) document.getElementById('exp-fecha-operacion').value = expediente.fechaOperacion || '';
+            if (document.getElementById('exp-hora')) document.getElementById('exp-hora').value = expediente.hora || '';
+            if (document.getElementById('exp-lugar')) document.getElementById('exp-lugar').value = expediente.lugar || '';
+        } else if (expediente.tipo === 'matriculacion') {
+            if (document.getElementById('exp-titular-mat')) document.getElementById('exp-titular-mat').value = expediente.titular || '';
+            if (document.getElementById('exp-vehiculo-mat')) document.getElementById('exp-vehiculo-mat').value = expediente.vehiculo || '';
+        } else if (expediente.tipo === 'baja') {
+            if (document.getElementById('exp-vehiculo-baja')) document.getElementById('exp-vehiculo-baja').value = expediente.vehiculo || '';
+            if (document.getElementById('exp-titular-baja')) document.getElementById('exp-titular-baja').value = expediente.titular || '';
+            if (document.getElementById('exp-motivo-baja')) document.getElementById('exp-motivo-baja').value = expediente.motivoBaja || '';
+        } else if (expediente.tipo === 'duplicado') {
+            if (document.getElementById('exp-vehiculo-dup')) document.getElementById('exp-vehiculo-dup').value = expediente.vehiculo || '';
+            if (document.getElementById('exp-titular-dup')) document.getElementById('exp-titular-dup').value = expediente.titular || '';
+            if (document.getElementById('exp-doc-duplicar')) document.getElementById('exp-doc-duplicar').value = expediente.documentoDuplicar || '';
+        } else if (expediente.tipo === 'canje') {
+            if (document.getElementById('exp-titular-canje')) document.getElementById('exp-titular-canje').value = expediente.titular || expediente.comprador || '';
+            if (document.getElementById('exp-canje-origen')) document.getElementById('exp-canje-origen').value = expediente.origen || '';
+            if (document.getElementById('exp-canje-pais')) document.getElementById('exp-canje-pais').value = expediente.pais || '';
+            if (document.getElementById('exp-canje-clase')) document.getElementById('exp-canje-clase').value = expediente.clasePermiso || '';
+            if (document.getElementById('exp-canje-numero')) document.getElementById('exp-canje-numero').value = expediente.numeroPermiso || '';
+            if (document.getElementById('exp-canje-fecha-exp')) document.getElementById('exp-canje-fecha-exp').value = expediente.fechaExpedicion || '';
+            if (document.getElementById('exp-canje-fecha-cad')) document.getElementById('exp-canje-fecha-cad').value = expediente.fechaCaducidad || '';
+            if (document.getElementById('exp-canje-localizador')) document.getElementById('exp-canje-localizador').value = expediente.localizadorDGT || '';
+            if (document.getElementById('exp-canje-colegio')) document.getElementById('exp-canje-colegio').value = expediente.recogerColegio || '';
+        } else if (expediente.tipo === 'vmp') {
+            if (document.getElementById('exp-vmp-subtipo')) document.getElementById('exp-vmp-subtipo').value = expediente.subtipoVMP || '';
+            if (document.getElementById('exp-vmp-comprador')) document.getElementById('exp-vmp-comprador').value = expediente.comprador || '';
+            if (document.getElementById('exp-vmp-num-serie')) document.getElementById('exp-vmp-num-serie').value = expediente.vmpNumSerie || '';
+            if (document.getElementById('exp-vmp-marca')) document.getElementById('exp-vmp-marca').value = expediente.vmpMarca || '';
+        }
+        
+        // Cargar datos económicos
+        document.getElementById('exp-tasa-trafico').value = expediente.tasaTrafico || 0;
+        document.getElementById('exp-impuesto').value = expediente.impuesto || 0;
+        document.getElementById('exp-honorarios').value = expediente.honorarios || 0;
+        document.getElementById('exp-pago-cliente').value = expediente.pagoCliente || 0;
+        document.getElementById('exp-es-empresa').checked = expediente.esEmpresa || false;
+        calcularTotales();
+        
+        // Cargar observaciones
+        document.getElementById('exp-observaciones').value = expediente.observaciones || '';
+        
+        mostrarAlerta(`✏️ Editando expediente ${expediente.numero}`, 'success');
+    }, 100); // Pequeño delay para que los campos estén visibles
 }
 
 // Lista de estados posibles para expedientes
