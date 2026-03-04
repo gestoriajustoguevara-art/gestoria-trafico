@@ -317,7 +317,7 @@ function cargarTablaClientes() {
             <td>
                 <div class="action-buttons">
                     <button class="action-btn btn-primary" onclick="editarCliente('${cliente.id}')">Editar</button>
-                    <button class="action-btn btn-danger" onclick="eliminarCliente('${cliente.id}')">✏️ Modificar</button>
+                    <button class="action-btn btn-danger" onclick="eliminarCliente('${cliente.id}')">Eliminar</button>
                 </div>
             </td>
         `;
@@ -354,7 +354,7 @@ function buscarClientes() {
             <td>
                 <div class="action-buttons">
                     <button class="action-btn btn-primary" onclick="editarCliente('${cliente.id}')">Editar</button>
-                    <button class="action-btn btn-danger" onclick="eliminarCliente('${cliente.id}')">✏️ Modificar</button>
+                    <button class="action-btn btn-danger" onclick="eliminarCliente('${cliente.id}')">Eliminar</button>
                 </div>
             </td>
         `;
@@ -455,7 +455,7 @@ function cargarTablaVehiculos() {
             <td>
                 <div class="action-buttons">
                     <button class="action-btn btn-primary" onclick="editarVehiculo('${vehiculo.id}')">Editar</button>
-                    <button class="action-btn btn-danger" onclick="eliminarVehiculo('${vehiculo.id}')">✏️ Modificar</button>
+                    <button class="action-btn btn-danger" onclick="eliminarVehiculo('${vehiculo.id}')">Eliminar</button>
                 </div>
             </td>
         `;
@@ -492,7 +492,7 @@ function buscarVehiculos() {
             <td>
                 <div class="action-buttons">
                     <button class="action-btn btn-primary" onclick="editarVehiculo('${vehiculo.id}')">Editar</button>
-                    <button class="action-btn btn-danger" onclick="eliminarVehiculo('${vehiculo.id}')">✏️ Modificar</button>
+                    <button class="action-btn btn-danger" onclick="eliminarVehiculo('${vehiculo.id}')">Eliminar</button>
                 </div>
             </td>
         `;
@@ -861,7 +861,7 @@ function cargarTablaExpedientes() {
                     <button class="action-btn btn-primary" onclick="verExpediente('${exp.id}')">Ver</button>
                     <button class="action-btn btn-success" onclick="exportarAHermes('${exp.id}')">📤 Hermes</button>
                     <button class="action-btn btn-success" onclick="generarPDF('${exp.id}')">PDF</button>
-                    <button class="action-btn btn-warning" onclick="modificarExpediente" style="background: #ff9800; color: white;('${exp.id}')">✏️ Modificar</button>
+                    <button class="action-btn btn-warning" onclick="modificarExpediente('${exp.id}')" style="background: #ff9800; color: white;">✏️ Modificar</button>
                 </div>
             </td>
         `;
@@ -952,7 +952,7 @@ function buscarExpedientes() {
                     <button class="action-btn btn-primary" onclick="verExpediente('${exp.id}')">Ver</button>
                     <button class="action-btn btn-success" onclick="exportarAHermes('${exp.id}')">📤 Hermes</button>
                     <button class="action-btn btn-success" onclick="generarPDF('${exp.id}')">PDF</button>
-                    <button class="action-btn btn-warning" onclick="modificarExpediente" style="background: #ff9800; color: white;('${exp.id}')">✏️ Modificar</button>
+                    <button class="action-btn btn-warning" onclick="modificarExpediente('${exp.id}')" style="background: #ff9800; color: white;">✏️ Modificar</button>
                 </div>
             </td>
         `;
