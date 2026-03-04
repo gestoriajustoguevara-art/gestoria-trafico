@@ -635,7 +635,19 @@ function guardarExpediente(event) {
         numero: generarNumeroExpediente(),
         tipo: tipo,
         fecha: new Date().toISOString(),
-        observaciones: document.getElementById('exp-observaciones').value
+        estado: 'pendiente_doc',
+        observaciones: document.getElementById('exp-observaciones').value,
+        // Datos económicos
+        tasaTrafico: parseFloat(document.getElementById('exp-tasa-trafico').value) || 0,
+        impuesto: parseFloat(document.getElementById('exp-impuesto').value) || 0,
+        honorarios: parseFloat(document.getElementById('exp-honorarios').value) || 0,
+        pagoCliente: parseFloat(document.getElementById('exp-pago-cliente').value) || 0,
+        ivaHonorarios: parseFloat(document.getElementById('exp-iva-honorarios').value) || 0,
+        totalSuplidos: parseFloat(document.getElementById('exp-total-suplidos').value) || 0,
+        totalFactura: parseFloat(document.getElementById('exp-total-factura').value) || 0,
+        difHonorarios: parseFloat(document.getElementById('exp-dif-honorarios').value) || 0,
+        esEmpresa: document.getElementById('exp-es-empresa').checked,
+        retencion: parseFloat(document.getElementById('exp-retencion').value) || 0
     };
     
     // Agregar campos específicos según el tipo
@@ -1966,3 +1978,197 @@ function mostrarMenuSync() {
         menu.style.display = 'none';
     }
 }
+
+// ==================== TARIFAS ====================
+
+// Tarifas por defecto
+const TARIFAS_DEFAULT = {
+    transferencia: { codigo: 'TRF', tasa: 65.23, impuesto: 0, honorarios: 70.00 },
+    baja: { codigo: 'BAJ', tasa: 14.72, impuesto: 0, honorarios: 40.00 },
+    duplicado: { codigo: 'DUP', tasa: 23.23, impuesto: 0, honorarios: 40.00 },
+    canje: { codigo: 'CNJ', tasa: 40.97, impuesto: 0, honorarios: 200.00 },
+    matriculacion: { codigo: 'MAT', tasa: 109.33, impuesto: 576.00, honorarios: 150.00 },
+    vmp: { codigo: 'VMP', tasa: 15.00, impuesto: 0, honorarios: 35.00 }
+};
+
+// Cargar tarifas desde localStorage o usar por defecto
+function cargarTarifas() {
+    const tarifasGuardadas = localStorage.getItem('gestoria_tarifas');
+    if (tarifasGuardadas) {
+        return JSON.parse(tarifasGuardadas);
+    }
+    return { ...TARIFAS_DEFAULT, iva: 21, retencion: 15 };
+}
+
+// Guardar tarifas en localStorage
+function guardarTarifas() {
+    const tarifas = {
+        transferencia: {
+            codigo: 'TRF',
+            tasa: parseFloat(document.getElementById('tarifa-trf-tasa')?.value) || 65.23,
+            impuesto: 0,
+            honorarios: parseFloat(document.getElementById('tarifa-trf-honorarios')?.value) || 70.00
+        },
+        baja: {
+            codigo: 'BAJ',
+            tasa: parseFloat(document.getElementById('tarifa-baj-tasa')?.value) || 14.72,
+            impuesto: 0,
+            honorarios: parseFloat(document.getElementById('tarifa-baj-honorarios')?.value) || 40.00
+        },
+        duplicado: {
+            codigo: 'DUP',
+            tasa: parseFloat(document.getElementById('tarifa-dup-tasa')?.value) || 23.23,
+            impuesto: 0,
+            honorarios: parseFloat(document.getElementById('tarifa-dup-honorarios')?.value) || 40.00
+        },
+        canje: {
+            codigo: 'CNJ',
+            tasa: parseFloat(document.getElementById('tarifa-cnj-tasa')?.value) || 40.97,
+            impuesto: 0,
+            honorarios: parseFloat(document.getElementById('tarifa-cnj-honorarios')?.value) || 200.00
+        },
+        matriculacion: {
+            codigo: 'MAT',
+            tasa: parseFloat(document.getElementById('tarifa-mat-tasa')?.value) || 109.33,
+            impuesto: parseFloat(document.getElementById('tarifa-mat-impuesto')?.value) || 576.00,
+            honorarios: parseFloat(document.getElementById('tarifa-mat-honorarios')?.value) || 150.00
+        },
+        vmp: {
+            codigo: 'VMP',
+            tasa: parseFloat(document.getElementById('tarifa-vmp-tasa')?.value) || 15.00,
+            impuesto: 0,
+            honorarios: parseFloat(document.getElementById('tarifa-vmp-honorarios')?.value) || 35.00
+        },
+        iva: parseFloat(document.getElementById('config-iva')?.value) || 21,
+        retencion: parseFloat(document.getElementById('config-retencion')?.value) || 15
+    };
+    
+    localStorage.setItem('gestoria_tarifas', JSON.stringify(tarifas));
+    console.log('Tarifas guardadas:', tarifas);
+}
+
+// Cargar tarifas en la pestaña de configuración
+function cargarTarifasEnFormulario() {
+    const tarifas = cargarTarifas();
+    
+    // Transferencia
+    if (document.getElementById('tarifa-trf-tasa')) {
+        document.getElementById('tarifa-trf-tasa').value = tarifas.transferencia?.tasa || 65.23;
+        document.getElementById('tarifa-trf-honorarios').value = tarifas.transferencia?.honorarios || 70.00;
+    }
+    // Baja
+    if (document.getElementById('tarifa-baj-tasa')) {
+        document.getElementById('tarifa-baj-tasa').value = tarifas.baja?.tasa || 14.72;
+        document.getElementById('tarifa-baj-honorarios').value = tarifas.baja?.honorarios || 40.00;
+    }
+    // Duplicado
+    if (document.getElementById('tarifa-dup-tasa')) {
+        document.getElementById('tarifa-dup-tasa').value = tarifas.duplicado?.tasa || 23.23;
+        document.getElementById('tarifa-dup-honorarios').value = tarifas.duplicado?.honorarios || 40.00;
+    }
+    // Canje
+    if (document.getElementById('tarifa-cnj-tasa')) {
+        document.getElementById('tarifa-cnj-tasa').value = tarifas.canje?.tasa || 40.97;
+        document.getElementById('tarifa-cnj-honorarios').value = tarifas.canje?.honorarios || 200.00;
+    }
+    // Matriculación
+    if (document.getElementById('tarifa-mat-tasa')) {
+        document.getElementById('tarifa-mat-tasa').value = tarifas.matriculacion?.tasa || 109.33;
+        document.getElementById('tarifa-mat-impuesto').value = tarifas.matriculacion?.impuesto || 576.00;
+        document.getElementById('tarifa-mat-honorarios').value = tarifas.matriculacion?.honorarios || 150.00;
+    }
+    // VMP
+    if (document.getElementById('tarifa-vmp-tasa')) {
+        document.getElementById('tarifa-vmp-tasa').value = tarifas.vmp?.tasa || 15.00;
+        document.getElementById('tarifa-vmp-honorarios').value = tarifas.vmp?.honorarios || 35.00;
+    }
+    // Config
+    if (document.getElementById('config-iva')) {
+        document.getElementById('config-iva').value = tarifas.iva || 21;
+        document.getElementById('config-retencion').value = tarifas.retencion || 15;
+    }
+}
+
+// Aplicar tarifas por defecto según el tipo de expediente
+function aplicarTarifasPorTipo(tipo) {
+    const tarifas = cargarTarifas();
+    const tarifa = tarifas[tipo];
+    
+    if (tarifa) {
+        document.getElementById('exp-tasa-trafico').value = tarifa.tasa.toFixed(2);
+        document.getElementById('exp-impuesto').value = tarifa.impuesto.toFixed(2);
+        document.getElementById('exp-honorarios').value = tarifa.honorarios.toFixed(2);
+        document.getElementById('exp-pago-cliente').value = '0.00';
+        calcularTotales();
+    }
+}
+
+// Calcular totales de la factura
+function calcularTotales() {
+    const tarifas = cargarTarifas();
+    const ivaPorc = tarifas.iva || 21;
+    const retencionPorc = tarifas.retencion || 15;
+    
+    const tasaTrafico = parseFloat(document.getElementById('exp-tasa-trafico').value) || 0;
+    const impuesto = parseFloat(document.getElementById('exp-impuesto').value) || 0;
+    const honorarios = parseFloat(document.getElementById('exp-honorarios').value) || 0;
+    const pagoCliente = parseFloat(document.getElementById('exp-pago-cliente').value) || 0;
+    const esEmpresa = document.getElementById('exp-es-empresa').checked;
+    
+    // Calcular IVA de honorarios
+    const ivaHonorarios = honorarios * (ivaPorc / 100);
+    document.getElementById('exp-iva-honorarios').value = ivaHonorarios.toFixed(2);
+    
+    // Total suplidos (sin IVA)
+    const totalSuplidos = tasaTrafico + impuesto;
+    document.getElementById('exp-total-suplidos').value = totalSuplidos.toFixed(2);
+    
+    // Total factura
+    let totalFactura = totalSuplidos + honorarios + ivaHonorarios;
+    
+    // Si es empresa, calcular retención
+    let retencion = 0;
+    if (esEmpresa) {
+        retencion = honorarios * (retencionPorc / 100);
+        document.getElementById('exp-retencion').value = retencion.toFixed(2);
+        document.getElementById('grupo-retencion').style.display = 'block';
+        totalFactura -= retencion;
+    } else {
+        document.getElementById('grupo-retencion').style.display = 'none';
+    }
+    
+    document.getElementById('exp-total-factura').value = totalFactura.toFixed(2);
+    
+    // DifHonorarios = Pago cliente - Total real (sin retención aplicada al cálculo)
+    const totalReal = totalSuplidos + honorarios + ivaHonorarios;
+    const difHonorarios = pagoCliente - totalReal;
+    document.getElementById('exp-dif-honorarios').value = difHonorarios.toFixed(2);
+    
+    // Colorear DifHonorarios según sea positivo o negativo
+    const difInput = document.getElementById('exp-dif-honorarios');
+    if (difHonorarios > 0) {
+        difInput.style.background = '#e8f5e9'; // Verde claro
+        difInput.style.color = '#2e7d32';
+    } else if (difHonorarios < 0) {
+        difInput.style.background = '#ffebee'; // Rojo claro
+        difInput.style.color = '#c62828';
+    } else {
+        difInput.style.background = '#fff3e0';
+        difInput.style.color = '#333';
+    }
+}
+
+// Modificar la función mostrarCamposExpediente para aplicar tarifas automáticamente
+const mostrarCamposExpedienteOriginal = mostrarCamposExpediente;
+mostrarCamposExpediente = function() {
+    mostrarCamposExpedienteOriginal();
+    const tipo = document.getElementById('expediente-tipo').value;
+    if (tipo) {
+        aplicarTarifasPorTipo(tipo);
+    }
+};
+
+// Cargar tarifas al iniciar
+document.addEventListener('DOMContentLoaded', function() {
+    cargarTarifasEnFormulario();
+});
