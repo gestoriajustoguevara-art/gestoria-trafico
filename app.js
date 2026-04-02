@@ -71,12 +71,7 @@ function switchTab(tabName) {
 function actualizarDashboard() {
     document.getElementById('total-clientes').textContent = clientes.length;
     document.getElementById('total-vehiculos').textContent = vehiculos.length;
-    
-    // Contar expedientes pendientes (no finalizados ni recogidos)
-    const expedientesPendientes = expedientes.filter(exp => 
-        exp.estado !== 'finalizado' && exp.estado !== 'recogido'
-    ).length;
-    document.getElementById('total-expedientes').textContent = expedientesPendientes;
+    document.getElementById('total-expedientes').textContent = expedientes.length;
     
     // Contar expedientes del mes actual
     const ahora = new Date();
@@ -129,15 +124,12 @@ function actualizarDashboard() {
             const vehiculo = vehiculos.find(v => v.id === exp.vehiculo);
             const matricula = vehiculo ? vehiculo.matricula : 'N/A';
             
-            // Obtener estado
-            const estadoInfo = obtenerEstiloEstado(exp.estado);
-            
             tr.innerHTML = `
                 <td><strong>${exp.numero}</strong></td>
                 <td><span class="expediente-badge ${badgeClass}">${exp.tipo.toUpperCase()}</span></td>
                 <td>${nombreCliente}</td>
                 <td>${matricula}</td>
-                <td><span style="${estadoInfo.estilo}" onclick="cambiarEstadoExpediente('${exp.id}')">${estadoInfo.texto}</span></td>
+                <td>${formatearFecha(exp.fecha)}</td>
                 <td>
                     <div class="action-buttons">
                         <button class="action-btn btn-primary" onclick="verExpediente('${exp.id}')">Ver</button>
@@ -230,25 +222,18 @@ function guardarCliente(event) {
         const index = clientes.findIndex(c => c.id === clienteEditandoId);
         if (index !== -1) {
             clientes[index] = cliente;
-            mostrarAlerta('✅ Cliente actualizado. Subiendo a Google Sheets...', 'success');
+            mostrarAlerta('✅ Cliente actualizado correctamente', 'success');
         }
         clienteEditandoId = null;
     } else {
         clientes.push(cliente);
-        mostrarAlerta('✅ Cliente guardado. Subiendo a Google Sheets...', 'success');
+        mostrarAlerta('✅ Cliente guardado correctamente', 'success');
     }
     
     guardarDatos();
     ocultarFormularioCliente();
     cargarTablaClientes();
     actualizarDashboard();
-    
-    // Subir automáticamente a Google Sheets
-    subirAGoogleSheets().then(() => {
-        console.log('✓ Clientes sincronizados con Google Sheets');
-    }).catch(err => {
-        console.error('Error al sincronizar clientes:', err);
-    });
 }
 
 // Función para mostrar/ocultar campos según el tipo de cliente
@@ -368,14 +353,7 @@ function eliminarCliente(id) {
         guardarDatos();
         cargarTablaClientes();
         actualizarDashboard();
-        mostrarAlerta('Cliente eliminado. Sincronizando...', 'success');
-        
-        // Subir automáticamente a Google Sheets
-        subirAGoogleSheets().then(() => {
-            console.log('✓ Eliminación sincronizada con Google Sheets');
-        }).catch(err => {
-            console.error('Error al sincronizar eliminación:', err);
-        });
+        mostrarAlerta('Cliente eliminado correctamente', 'success');
     }
 }
 
@@ -412,25 +390,18 @@ function guardarVehiculo(event) {
         const index = vehiculos.findIndex(v => v.id === vehiculoEditandoId);
         if (index !== -1) {
             vehiculos[index] = vehiculo;
-            mostrarAlerta('✅ Vehículo actualizado. Subiendo a Google Sheets...', 'success');
+            mostrarAlerta('✅ Vehículo actualizado correctamente', 'success');
         }
         vehiculoEditandoId = null;
     } else {
         vehiculos.push(vehiculo);
-        mostrarAlerta('✅ Vehículo guardado. Subiendo a Google Sheets...', 'success');
+        mostrarAlerta('✅ Vehículo guardado correctamente', 'success');
     }
     
     guardarDatos();
     ocultarFormularioVehiculo();
     cargarTablaVehiculos();
     actualizarDashboard();
-    
-    // Subir automáticamente a Google Sheets
-    subirAGoogleSheets().then(() => {
-        console.log('✓ Vehículos sincronizados con Google Sheets');
-    }).catch(err => {
-        console.error('Error al sincronizar vehículos:', err);
-    });
 }
 
 function cargarTablaVehiculos() {
@@ -506,14 +477,7 @@ function eliminarVehiculo(id) {
         guardarDatos();
         cargarTablaVehiculos();
         actualizarDashboard();
-        mostrarAlerta('Vehículo eliminado. Sincronizando...', 'success');
-        
-        // Subir automáticamente a Google Sheets
-        subirAGoogleSheets().then(() => {
-            console.log('✓ Eliminación sincronizada con Google Sheets');
-        }).catch(err => {
-            console.error('Error al sincronizar eliminación:', err);
-        });
+        mostrarAlerta('Vehículo eliminado correctamente', 'success');
     }
 }
 
@@ -527,6 +491,8 @@ function mostrarCamposExpediente() {
     document.getElementById('campos-matriculacion').style.display = 'none';
     document.getElementById('campos-baja').style.display = 'none';
     document.getElementById('campos-duplicado').style.display = 'none';
+    document.getElementById('campos-canje').style.display = 'none';
+    document.getElementById('campos-vmp').style.display = 'none';
     
     // Remover required de TODOS los campos del formulario
     document.querySelectorAll('#form-expediente [required]').forEach(el => el.removeAttribute('required'));
@@ -630,24 +596,16 @@ function guardarExpediente(event) {
         return;
     }
     
+    // Determinar si estamos editando o creando nuevo
+    const editandoId = window._expedienteEditandoId || null;
+    const expedienteExistente = editandoId ? expedientes.find(e => e.id === editandoId) : null;
+
     const expediente = {
-        id: Date.now().toString(),
-        numero: generarNumeroExpediente(),
+        id: editandoId || Date.now().toString(),
+        numero: expedienteExistente ? expedienteExistente.numero : generarNumeroExpediente(),
         tipo: tipo,
-        fecha: new Date().toISOString(),
-        estado: 'pendiente_doc',
-        observaciones: document.getElementById('exp-observaciones').value,
-        // Datos económicos
-        tasaTrafico: parseFloat(document.getElementById('exp-tasa-trafico').value) || 0,
-        impuesto: parseFloat(document.getElementById('exp-impuesto').value) || 0,
-        honorarios: parseFloat(document.getElementById('exp-honorarios').value) || 0,
-        pagoCliente: parseFloat(document.getElementById('exp-pago-cliente').value) || 0,
-        ivaHonorarios: parseFloat(document.getElementById('exp-iva-honorarios').value) || 0,
-        totalSuplidos: parseFloat(document.getElementById('exp-total-suplidos').value) || 0,
-        totalFactura: parseFloat(document.getElementById('exp-total-factura').value) || 0,
-        difHonorarios: parseFloat(document.getElementById('exp-dif-honorarios').value) || 0,
-        esEmpresa: document.getElementById('exp-es-empresa').checked,
-        retencion: parseFloat(document.getElementById('exp-retencion').value) || 0
+        fecha: expedienteExistente ? expedienteExistente.fecha : (document.getElementById('exp-fecha') ? document.getElementById('exp-fecha').value || new Date().toISOString() : new Date().toISOString()),
+        observaciones: document.getElementById('exp-observaciones').value
     };
     
     // Agregar campos específicos según el tipo
@@ -672,6 +630,9 @@ function guardarExpediente(event) {
             mostrarAlerta('Por favor, selecciona el titular y el vehículo', 'error');
             return;
         }
+        // Guardar todos los campos específicos de matriculación
+        const datosMatriculacion = leerCamposMatriculacion();
+        Object.assign(expediente, datosMatriculacion);
     } else if (tipo === 'baja') {
         expediente.vehiculo = document.getElementById('exp-vehiculo-baja').value;
         expediente.titular = document.getElementById('exp-titular-baja').value;
@@ -731,37 +692,23 @@ function guardarExpediente(event) {
     
     console.log('Expediente a guardar:', expediente);
     
-    // Si estamos editando, actualizar; si no, añadir nuevo
-    if (expedienteEditandoId) {
-        const index = expedientes.findIndex(e => e.id === expedienteEditandoId);
-        if (index !== -1) {
-            // Mantener el ID y número original
-            expediente.id = expedienteEditandoId;
-            expediente.numero = expedientes[index].numero;
-            expediente.fecha = expedientes[index].fecha; // Mantener fecha original
-            expedientes[index] = expediente;
-            mostrarAlerta(`✅ Expediente ${expediente.numero} actualizado. Subiendo a Google Sheets...`, 'success');
-        }
-        expedienteEditandoId = null;
+    if (editandoId) {
+        // Edición: reemplazar el expediente existente
+        const idx = expedientes.findIndex(e => e.id === editandoId);
+        if (idx !== -1) expedientes[idx] = expediente;
+        window._expedienteEditandoId = null;
     } else {
         expedientes.push(expediente);
-        mostrarAlerta(`✅ Expediente ${expediente.numero} creado correctamente. Subiendo a Google Sheets...`, 'success');
     }
-    
     guardarDatos();
     
     console.log('Expediente guardado. Total expedientes:', expedientes.length);
     
+    const accion = editandoId ? 'actualizado' : 'creado';
+    mostrarAlerta(`✅ Expediente ${expediente.numero} ${accion} correctamente`, 'success');
     limpiarFormularioExpediente();
     actualizarDashboard();
     cargarTablaExpedientes();
-    
-    // Subir automáticamente a Google Sheets
-    subirAGoogleSheets().then(() => {
-        console.log('✓ Datos sincronizados con Google Sheets');
-    }).catch(err => {
-        console.error('Error al sincronizar:', err);
-    });
     
     // Cambiar a la pestaña de expedientes después de 1 segundo
     setTimeout(() => {
@@ -846,22 +793,20 @@ function cargarTablaExpedientes() {
             matricula = vehiculo ? vehiculo.matricula : 'N/A';
         }
         
-        // Obtener estado con estilo
-        const estadoInfo = obtenerEstiloEstado(exp.estado);
-        
         tr.innerHTML = `
             <td><strong>${exp.numero}</strong></td>
             <td><span class="expediente-badge ${badgeClass}">${exp.tipo.toUpperCase()}</span></td>
             <td>${nombreCliente}</td>
             <td>${matricula}</td>
             <td>${formatearFecha(exp.fecha)}</td>
-            <td><span style="${estadoInfo.estilo}" onclick="cambiarEstadoExpediente('${exp.id}')" title="Clic para cambiar estado">${estadoInfo.texto}</span></td>
+            <td><span style="color: green;">✓ Activo</span></td>
             <td>
                 <div class="action-buttons">
                     <button class="action-btn btn-primary" onclick="verExpediente('${exp.id}')">Ver</button>
+                    <button class="action-btn" style="background:#f39c12;color:white;" onclick="modificarExpediente('${exp.id}')">✏️ Modificar</button>
                     <button class="action-btn btn-success" onclick="exportarAHermes('${exp.id}')">📤 Hermes</button>
                     <button class="action-btn btn-success" onclick="generarPDF('${exp.id}')">PDF</button>
-                    <button class="action-btn btn-warning" onclick="modificarExpediente('${exp.id}')" style="background: #ff9800; color: white;">✏️ Modificar</button>
+                    <button class="action-btn btn-danger" onclick="eliminarExpediente('${exp.id}')">Eliminar</button>
                 </div>
             </td>
         `;
@@ -937,22 +882,19 @@ function buscarExpedientes() {
             matricula = vehiculo ? vehiculo.matricula : 'N/A';
         }
         
-        // Obtener estado con estilo
-        const estadoInfo = obtenerEstiloEstado(exp.estado);
-        
         tr.innerHTML = `
             <td><strong>${exp.numero}</strong></td>
             <td><span class="expediente-badge ${badgeClass}">${exp.tipo.toUpperCase()}</span></td>
             <td>${nombreCliente}</td>
             <td>${matricula}</td>
             <td>${formatearFecha(exp.fecha)}</td>
-            <td><span style="${estadoInfo.estilo}" onclick="cambiarEstadoExpediente('${exp.id}')" title="Clic para cambiar estado">${estadoInfo.texto}</span></td>
+            <td><span style="color: green;">✓ Activo</span></td>
             <td>
                 <div class="action-buttons">
                     <button class="action-btn btn-primary" onclick="verExpediente('${exp.id}')">Ver</button>
                     <button class="action-btn btn-success" onclick="exportarAHermes('${exp.id}')">📤 Hermes</button>
                     <button class="action-btn btn-success" onclick="generarPDF('${exp.id}')">PDF</button>
-                    <button class="action-btn btn-warning" onclick="modificarExpediente('${exp.id}')" style="background: #ff9800; color: white;">✏️ Modificar</button>
+                    <button class="action-btn btn-danger" onclick="eliminarExpediente('${exp.id}')">Eliminar</button>
                 </div>
             </td>
         `;
@@ -990,143 +932,75 @@ function verExpediente(id) {
     alert(detalles);
 }
 
-// Variable para guardar el ID del expediente que se está editando
-let expedienteEditandoId = null;
-
 function modificarExpediente(id) {
-    console.log('Modificando expediente con ID:', id);
-    const expediente = expedientes.find(e => e.id == id);
+    const expediente = expedientes.find(e => e.id === id);
     if (!expediente) {
-        mostrarAlerta('No se encontró el expediente', 'error');
-        console.log('Expedientes disponibles:', expedientes.map(e => e.id));
+        mostrarAlerta('Expediente no encontrado', 'error');
         return;
     }
-    
-    console.log('Expediente encontrado:', expediente);
-    expedienteEditandoId = id;
-    
-    // Cambiar a la pestaña de nuevo expediente
-    document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
-    document.querySelectorAll('.nav-tab').forEach(btn => btn.classList.remove('active'));
-    document.getElementById('nuevo-expediente').classList.add('active');
-    document.querySelectorAll('.nav-tab')[4].classList.add('active');
-    
-    // Cargar el tipo de expediente
-    document.getElementById('expediente-tipo').value = expediente.tipo;
-    mostrarCamposExpedienteOriginal(); // Usar la función original para no disparar tarifas
-    
-    // Cargar datos según el tipo
+
+    // Ir a la pestaña de expedientes y mostrar formulario
+    mostrarTab('expedientes');
+    document.getElementById('formulario-expediente').style.display = 'block';
+
+    // Marcar que estamos editando
+    window._expedienteEditandoId = id;
+
+    // Rellenar campos comunes
+    document.getElementById('exp-tipo').value = expediente.tipo;
+    document.getElementById('exp-fecha').value = expediente.fecha || '';
+    document.getElementById('exp-observaciones').value = expediente.observaciones || '';
+
+    // Mostrar campos del tipo correspondiente
+    mostrarCamposExpediente();
+    cargarSelectsExpedientes();
+
+    // Rellenar campos específicos según tipo
     setTimeout(() => {
-        if (expediente.tipo === 'transferencia') {
-            if (document.getElementById('exp-vehiculo')) document.getElementById('exp-vehiculo').value = expediente.vehiculo || '';
-            if (document.getElementById('exp-vendedor')) document.getElementById('exp-vendedor').value = expediente.vendedor || '';
-            if (document.getElementById('exp-comprador')) document.getElementById('exp-comprador').value = expediente.comprador || '';
-            if (document.getElementById('exp-precio')) document.getElementById('exp-precio').value = expediente.precio || '';
-            if (document.getElementById('exp-fecha-operacion')) document.getElementById('exp-fecha-operacion').value = expediente.fechaOperacion || '';
-            if (document.getElementById('exp-hora')) document.getElementById('exp-hora').value = expediente.hora || '';
-            if (document.getElementById('exp-lugar')) document.getElementById('exp-lugar').value = expediente.lugar || '';
-        } else if (expediente.tipo === 'matriculacion') {
-            if (document.getElementById('exp-titular-mat')) document.getElementById('exp-titular-mat').value = expediente.titular || '';
-            if (document.getElementById('exp-vehiculo-mat')) document.getElementById('exp-vehiculo-mat').value = expediente.vehiculo || '';
+        if (expediente.tipo === 'matriculacion') {
+            document.getElementById('exp-titular-mat').value = expediente.titular || '';
+            document.getElementById('exp-vehiculo-mat').value = expediente.vehiculo || '';
+            cargarCamposMatriculacion(expediente);
+        } else if (expediente.tipo === 'transferencia') {
+            document.getElementById('exp-vendedor').value = expediente.vendedor || '';
+            document.getElementById('exp-comprador').value = expediente.comprador || '';
+            document.getElementById('exp-vehiculo').value = expediente.vehiculo || '';
+            document.getElementById('exp-precio').value = expediente.precio || '';
+            document.getElementById('exp-fecha-venta').value = expediente.fechaVenta || '';
+            document.getElementById('exp-hora-venta').value = expediente.horaVenta || '';
+            document.getElementById('exp-lugar-venta').value = expediente.lugarVenta || '';
         } else if (expediente.tipo === 'baja') {
-            if (document.getElementById('exp-vehiculo-baja')) document.getElementById('exp-vehiculo-baja').value = expediente.vehiculo || '';
-            if (document.getElementById('exp-titular-baja')) document.getElementById('exp-titular-baja').value = expediente.titular || '';
-            if (document.getElementById('exp-motivo-baja')) document.getElementById('exp-motivo-baja').value = expediente.motivoBaja || '';
+            document.getElementById('exp-vehiculo-baja').value = expediente.vehiculo || '';
+            document.getElementById('exp-titular-baja').value = expediente.titular || '';
+            document.getElementById('exp-motivo-baja').value = expediente.motivoBaja || '';
         } else if (expediente.tipo === 'duplicado') {
-            if (document.getElementById('exp-vehiculo-dup')) document.getElementById('exp-vehiculo-dup').value = expediente.vehiculo || '';
-            if (document.getElementById('exp-titular-dup')) document.getElementById('exp-titular-dup').value = expediente.titular || '';
-            if (document.getElementById('exp-doc-duplicar')) document.getElementById('exp-doc-duplicar').value = expediente.documentoDuplicar || '';
+            document.getElementById('exp-vehiculo-dup').value = expediente.vehiculo || '';
+            document.getElementById('exp-titular-dup').value = expediente.titular || '';
+            document.getElementById('exp-doc-duplicar').value = expediente.documentoDuplicar || '';
         } else if (expediente.tipo === 'canje') {
-            if (document.getElementById('exp-titular-canje')) document.getElementById('exp-titular-canje').value = expediente.titular || expediente.comprador || '';
-            if (document.getElementById('exp-canje-origen')) document.getElementById('exp-canje-origen').value = expediente.origen || '';
-            if (document.getElementById('exp-canje-pais')) document.getElementById('exp-canje-pais').value = expediente.pais || '';
-            if (document.getElementById('exp-canje-clase')) document.getElementById('exp-canje-clase').value = expediente.clasePermiso || '';
-            if (document.getElementById('exp-canje-numero')) document.getElementById('exp-canje-numero').value = expediente.numeroPermiso || '';
-            if (document.getElementById('exp-canje-fecha-exp')) document.getElementById('exp-canje-fecha-exp').value = expediente.fechaExpedicion || '';
-            if (document.getElementById('exp-canje-fecha-cad')) document.getElementById('exp-canje-fecha-cad').value = expediente.fechaCaducidad || '';
-            if (document.getElementById('exp-canje-localizador')) document.getElementById('exp-canje-localizador').value = expediente.localizadorDGT || '';
-            if (document.getElementById('exp-canje-colegio')) document.getElementById('exp-canje-colegio').value = expediente.recogerColegio || '';
-        } else if (expediente.tipo === 'vmp') {
-            if (document.getElementById('exp-vmp-subtipo')) document.getElementById('exp-vmp-subtipo').value = expediente.subtipoVMP || '';
-            if (document.getElementById('exp-vmp-comprador')) document.getElementById('exp-vmp-comprador').value = expediente.comprador || '';
-            if (document.getElementById('exp-vmp-num-serie')) document.getElementById('exp-vmp-num-serie').value = expediente.vmpNumSerie || '';
-            if (document.getElementById('exp-vmp-marca')) document.getElementById('exp-vmp-marca').value = expediente.vmpMarca || '';
+            document.getElementById('exp-titular-canje').value = expediente.titular || '';
+            document.getElementById('exp-canje-origen').value = expediente.origen || '';
+            document.getElementById('exp-canje-pais').value = expediente.pais || '';
+            document.getElementById('exp-canje-clase').value = expediente.clasePermiso || '';
+            document.getElementById('exp-canje-numero').value = expediente.numeroPermiso || '';
+            document.getElementById('exp-canje-fecha-exp').value = expediente.fechaExpedicion || '';
+            document.getElementById('exp-canje-fecha-cad').value = expediente.fechaCaducidad || '';
+            document.getElementById('exp-canje-localizador').value = expediente.localizadorDGT || '';
+            document.getElementById('exp-canje-colegio').value = expediente.recogerColegio || '';
         }
-        
-        // Cargar datos económicos
-        document.getElementById('exp-tasa-trafico').value = expediente.tasaTrafico || 0;
-        document.getElementById('exp-impuesto').value = expediente.impuesto || 0;
-        document.getElementById('exp-honorarios').value = expediente.honorarios || 0;
-        document.getElementById('exp-pago-cliente').value = expediente.pagoCliente || 0;
-        document.getElementById('exp-es-empresa').checked = expediente.esEmpresa || false;
-        calcularTotales();
-        
-        // Cargar observaciones
-        document.getElementById('exp-observaciones').value = expediente.observaciones || '';
-        
-        mostrarAlerta(`✏️ Editando expediente ${expediente.numero}`, 'success');
-    }, 100); // Pequeño delay para que los campos estén visibles
+    }, 200); // pequeño delay para que los selects se hayan cargado
+
+    document.getElementById('formulario-expediente').scrollIntoView({ behavior: 'smooth' });
+    mostrarAlerta('Editando expediente: ' + expediente.numero, 'success');
 }
 
-// Lista de estados posibles para expedientes
-const ESTADOS_EXPEDIENTE = [
-    { valor: 'pendiente_doc', texto: '📋 Pendiente Doc', color: '#ff9800' },
-    { valor: 'enviado_ctit', texto: '📤 Enviado CTIT', color: '#2196f3' },
-    { valor: 'envio_pdf', texto: '📄 Envío PDF', color: '#9c27b0' },
-    { valor: 'remesado', texto: '💰 Remesado', color: '#00bcd4' },
-    { valor: 'finalizado', texto: '✅ Finalizado', color: '#4caf50' },
-    { valor: 'recogido', texto: '📦 Recogido', color: '#8bc34a' },
-    { valor: 'con_defectos', texto: '⚠️ Con Defectos', color: '#f44336' }
-];
-
-// Obtener estilo y texto del estado
-function obtenerEstiloEstado(estado) {
-    const estadoEncontrado = ESTADOS_EXPEDIENTE.find(e => e.valor === estado);
-    
-    if (estadoEncontrado) {
-        return {
-            texto: estadoEncontrado.texto,
-            estilo: `color: white; background-color: ${estadoEncontrado.color}; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 12px;`
-        };
-    }
-    
-    // Estado por defecto (pendiente_doc)
-    return {
-        texto: '📋 Pendiente Doc',
-        estilo: 'color: white; background-color: #ff9800; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 12px;'
-    };
-}
-
-// Cambiar estado de un expediente
-function cambiarEstadoExpediente(id) {
-    const expediente = expedientes.find(e => e.id === id);
-    if (!expediente) return;
-    
-    // Crear lista de opciones
-    let opciones = ESTADOS_EXPEDIENTE.map((e, i) => `${i + 1} - ${e.texto}`).join('\n');
-    
-    const seleccion = prompt(
-        `Cambiar estado del expediente ${expediente.numero}\n\nEstado actual: ${obtenerEstiloEstado(expediente.estado).texto}\n\nSelecciona nuevo estado:\n\n${opciones}\n\nEscribe el número:`
-    );
-    
-    if (seleccion) {
-        const indice = parseInt(seleccion) - 1;
-        if (indice >= 0 && indice < ESTADOS_EXPEDIENTE.length) {
-            expediente.estado = ESTADOS_EXPEDIENTE[indice].valor;
-            guardarDatos();
-            cargarTablaExpedientes();
-            actualizarDashboard();
-            mostrarAlerta(`Estado cambiado a: ${ESTADOS_EXPEDIENTE[indice].texto}`, 'success');
-            
-            // Subir automáticamente a Google Sheets
-            subirAGoogleSheets().then(() => {
-                console.log('✓ Estado sincronizado con Google Sheets');
-            }).catch(err => {
-                console.error('Error al sincronizar estado:', err);
-            });
-        } else {
-            mostrarAlerta('Opción no válida', 'error');
-        }
+function eliminarExpediente(id) {
+    if (confirm('¿Estás seguro de que quieres eliminar este expediente?')) {
+        expedientes = expedientes.filter(e => e.id !== id);
+        guardarDatos();
+        cargarTablaExpedientes();
+        actualizarDashboard();
+        mostrarAlerta('Expediente eliminado correctamente', 'success');
     }
 }
 
@@ -1719,50 +1593,7 @@ async function subirAGoogleSheets() {
         await subirHoja('Expedientes', expedientesParaSheets, [
             'id', 'numero', 'fecha', 'tipo', 'estado',
             'vendedor', 'nombreVendedor', 'comprador', 'nombreComprador', 'vehiculo', 'matriculaVehiculo',
-            'precio', 'observaciones',
-            'tasaTrafico', 'impuesto', 'honorarios', 'ivaHonorarios', 'totalSuplidos', 'totalFactura', 
-            'pagoCliente', 'difHonorarios', 'esEmpresa', 'retencion'
-        ]);
-        
-        // Subir hoja de FACTURACIÓN con todos los datos económicos
-        const facturacion = expedientes.map(exp => {
-            // Buscar nombre del cliente
-            const idCliente = exp.comprador || exp.titular || '';
-            const cliente = clientes.find(c => c.id == idCliente);
-            let nombreCliente = '';
-            if (cliente) {
-                if (cliente.tipoCliente === 'juridica') {
-                    nombreCliente = cliente.nombre || '';
-                } else {
-                    nombreCliente = `${cliente.nombre || ''} ${cliente.apellido1 || ''} ${cliente.apellido2 || ''}`.trim();
-                }
-            }
-            
-            return {
-                id: exp.id,
-                numero: exp.numero,
-                fecha: exp.fecha,
-                tipo: exp.tipo,
-                estado: exp.estado,
-                cliente: nombreCliente,
-                tasaTrafico: exp.tasaTrafico || 0,
-                impuesto: exp.impuesto || 0,
-                honorarios: exp.honorarios || 0,
-                ivaHonorarios: exp.ivaHonorarios || 0,
-                totalSuplidos: exp.totalSuplidos || 0,
-                totalFactura: exp.totalFactura || 0,
-                pagoCliente: exp.pagoCliente || 0,
-                difHonorarios: exp.difHonorarios || 0,
-                esEmpresa: exp.esEmpresa ? 'SÍ' : 'NO',
-                retencion: exp.retencion || 0
-            };
-        });
-        
-        await subirHoja('Facturacion', facturacion, [
-            'id', 'numero', 'fecha', 'tipo', 'estado', 'cliente',
-            'tasaTrafico', 'impuesto', 'honorarios', 'ivaHonorarios', 
-            'totalSuplidos', 'totalFactura', 'pagoCliente', 'difHonorarios', 
-            'esEmpresa', 'retencion'
+            'precio', 'observaciones'
         ]);
         
         // Subir hojas específicas por tipo de trámite
@@ -1795,8 +1626,31 @@ async function subirAGoogleSheets() {
         // MATRICULACIONES
         const matriculaciones = expedientes.filter(e => e.tipo === 'matriculacion');
         if (matriculaciones.length > 0) {
-            await subirHoja('Matriculaciones', matriculaciones, [
-                'id', 'numero', 'fecha', 'titular', 'vehiculo', 'observaciones'
+            const matParaSheets = matriculaciones.map(exp => {
+                const titular = clientes.find(c => c.id == exp.titular);
+                const vehiculo = vehiculos.find(v => v.id == exp.vehiculo);
+                let nombreTitular = '';
+                if (titular) {
+                    nombreTitular = titular.tipoCliente === 'juridica'
+                        ? (titular.razonSocial || '')
+                        : ((titular.nombre || '') + ' ' + (titular.apellido1 || '')).trim();
+                }
+                return {
+                    ...exp,
+                    nombreTitular,
+                    matriculaVehiculo: vehiculo ? vehiculo.matricula : ''
+                };
+            });
+            await subirHoja('Matriculaciones', matParaSheets, [
+                'id', 'numero', 'fecha', 'titular', 'nombreTitular', 'vehiculo', 'matriculaVehiculo',
+                'tipoAdquisicion', 'valorCompra', 'co2', 'exento',
+                'valorHacienda', 'baseItp', 'porcentajeItp', 'cuotaItp',
+                'porcentajeMatSugerido', 'porcentajeMatAplicado', 'baseMat', 'cuotaMat',
+                'ivtmImporte', 'ivtmFechaFactura', 'ivtmPagado', 'ivtmFechaPago', 'ivtmCobrado',
+                'supMatImporte', 'supMatFechaFactura', 'supMatPagado', 'supMatFechaPago', 'supMatCobrado',
+                'mod06Importe', 'mod06FechaFactura', 'mod06Pagado', 'mod06FechaPago', 'mod06Cobrado',
+                'peritoNecesario', 'peritoImporte', 'peritoFechaFactura', 'peritoPagado', 'peritoFechaPago', 'peritoCobrado',
+                'observaciones'
             ]);
         }
         
@@ -2098,196 +1952,187 @@ function mostrarMenuSync() {
     }
 }
 
-// ==================== TARIFAS ====================
+// ==================== MATRICULACIONES: LÓGICA DE CAMPOS ====================
 
-// Tarifas por defecto
-const TARIFAS_DEFAULT = {
-    transferencia: { codigo: 'TRF', tasa: 65.23, impuesto: 0, honorarios: 70.00 },
-    baja: { codigo: 'BAJ', tasa: 14.72, impuesto: 0, honorarios: 40.00 },
-    duplicado: { codigo: 'DUP', tasa: 23.23, impuesto: 0, honorarios: 40.00 },
-    canje: { codigo: 'CNJ', tasa: 40.97, impuesto: 0, honorarios: 200.00 },
-    matriculacion: { codigo: 'MAT', tasa: 109.33, impuesto: 576.00, honorarios: 150.00 },
-    vmp: { codigo: 'VMP', tasa: 15.00, impuesto: 0, honorarios: 35.00 }
-};
+// Tramos CO2 para el impuesto de matriculación en Andalucía
+// Fuente: Ley reguladora del IEDMT (Impuesto Especial sobre Determinados Medios de Transporte)
+const TRAMOS_CO2_ANDALUCIA = [
+    { hasta: 0,   porcentaje: 0,    descripcion: 'Eléctrico puro (0 g/km) — Exento' },
+    { hasta: 120, porcentaje: 0,    descripcion: 'Hasta 120 g/km — Exento (puede variar)' },
+    { hasta: 160, porcentaje: 4.75, descripcion: '121–160 g/km — 4,75%' },
+    { hasta: 200, porcentaje: 9.75, descripcion: '161–200 g/km — 9,75%' },
+    { hasta: 999, porcentaje: 14.75,descripcion: 'Más de 200 g/km — 14,75%' },
+];
 
-// Cargar tarifas desde localStorage o usar por defecto
-function cargarTarifas() {
-    const tarifasGuardadas = localStorage.getItem('gestoria_tarifas');
-    if (tarifasGuardadas) {
-        return JSON.parse(tarifasGuardadas);
+function obtenerTramo(co2) {
+    if (co2 === '' || co2 === null || isNaN(co2)) return null;
+    const valor = parseFloat(co2);
+    if (valor <= 0) return TRAMOS_CO2_ANDALUCIA[0];
+    for (const tramo of TRAMOS_CO2_ANDALUCIA) {
+        if (valor <= tramo.hasta) return tramo;
     }
-    return { ...TARIFAS_DEFAULT, iva: 21, retencion: 15 };
+    return TRAMOS_CO2_ANDALUCIA[TRAMOS_CO2_ANDALUCIA.length - 1];
 }
 
-// Guardar tarifas en localStorage
-function guardarTarifas() {
-    const tarifas = {
-        transferencia: {
-            codigo: 'TRF',
-            tasa: parseFloat(document.getElementById('tarifa-trf-tasa')?.value) || 65.23,
-            impuesto: 0,
-            honorarios: parseFloat(document.getElementById('tarifa-trf-honorarios')?.value) || 70.00
-        },
-        baja: {
-            codigo: 'BAJ',
-            tasa: parseFloat(document.getElementById('tarifa-baj-tasa')?.value) || 14.72,
-            impuesto: 0,
-            honorarios: parseFloat(document.getElementById('tarifa-baj-honorarios')?.value) || 40.00
-        },
-        duplicado: {
-            codigo: 'DUP',
-            tasa: parseFloat(document.getElementById('tarifa-dup-tasa')?.value) || 23.23,
-            impuesto: 0,
-            honorarios: parseFloat(document.getElementById('tarifa-dup-honorarios')?.value) || 40.00
-        },
-        canje: {
-            codigo: 'CNJ',
-            tasa: parseFloat(document.getElementById('tarifa-cnj-tasa')?.value) || 40.97,
-            impuesto: 0,
-            honorarios: parseFloat(document.getElementById('tarifa-cnj-honorarios')?.value) || 200.00
-        },
-        matriculacion: {
-            codigo: 'MAT',
-            tasa: parseFloat(document.getElementById('tarifa-mat-tasa')?.value) || 109.33,
-            impuesto: parseFloat(document.getElementById('tarifa-mat-impuesto')?.value) || 576.00,
-            honorarios: parseFloat(document.getElementById('tarifa-mat-honorarios')?.value) || 150.00
-        },
-        vmp: {
-            codigo: 'VMP',
-            tasa: parseFloat(document.getElementById('tarifa-vmp-tasa')?.value) || 15.00,
-            impuesto: 0,
-            honorarios: parseFloat(document.getElementById('tarifa-vmp-honorarios')?.value) || 35.00
-        },
-        iva: parseFloat(document.getElementById('config-iva')?.value) || 21,
-        retencion: parseFloat(document.getElementById('config-retencion')?.value) || 15
+function actualizarCamposMatriculacion() {
+    const tipo = document.getElementById('mat-tipo-adquisicion').value;
+    const exento = document.getElementById('mat-exento').value;
+
+    // ITP: solo para 2ª mano sin factura
+    const bloqueItp = document.getElementById('bloque-itp');
+    bloqueItp.style.display = (tipo === 'segunda_contrato') ? 'block' : 'none';
+
+    // Bloque impuesto matriculación (ocultamos si exento)
+    const bloqueImpMat = document.getElementById('bloque-impuesto-mat');
+    const bloqueSup    = document.getElementById('bloque-suplido-mat');
+    if (exento === 'si') {
+        bloqueImpMat.style.display = 'none';
+        bloqueSup.style.display    = 'none';
+        document.getElementById('bloque-suplido-mod06').style.display = 'block';
+    } else {
+        bloqueImpMat.style.display = 'block';
+        bloqueSup.style.display    = 'block';
+        document.getElementById('bloque-suplido-mod06').style.display = 'none';
+    }
+
+    calcularMatriculacion();
+}
+
+function calcularMatriculacion() {
+    const tipo        = document.getElementById('mat-tipo-adquisicion').value;
+    const valorCompra = parseFloat(document.getElementById('mat-valor-compra').value) || 0;
+    const co2         = document.getElementById('mat-co2').value;
+    const exento      = document.getElementById('mat-exento').value;
+
+    // --- Base ITP (el mayor entre valor compra y valor Hacienda) ---
+    if (tipo === 'segunda_contrato') {
+        const valorHacienda = parseFloat(document.getElementById('mat-valor-hacienda').value) || 0;
+        const baseItp = Math.max(valorCompra, valorHacienda);
+        document.getElementById('mat-base-itp').value = baseItp > 0 ? baseItp.toFixed(2) : '';
+        const pctItp = parseFloat(document.getElementById('mat-porcentaje-itp').value) || 0;
+        document.getElementById('mat-cuota-itp').value = baseItp > 0 ? (baseItp * pctItp / 100).toFixed(2) : '';
+    }
+
+    // --- Impuesto de matriculación ---
+    if (exento !== 'si') {
+        const tramo = obtenerTramo(co2);
+        if (tramo) {
+            // Sugerir porcentaje pero no sobreescribir si el usuario ya lo tocó
+            const campoPct    = document.getElementById('mat-porcentaje-mat');
+            const campoManual = document.getElementById('mat-porcentaje-mat-manual');
+            const infoEl      = document.getElementById('mat-tramo-co2-info');
+
+            campoPct.value = tramo.porcentaje;
+            infoEl.textContent = '↳ ' + tramo.descripcion;
+
+            // Si el campo manual está vacío, llenarlo con el sugerido
+            if (campoManual.value === '' || campoManual.dataset.autoSet === 'true') {
+                campoManual.value = tramo.porcentaje;
+                campoManual.dataset.autoSet = 'true';
+            }
+
+            // Calcular cuota con el % manual (que el usuario puede rectificar)
+            const pctAplicar = parseFloat(campoManual.value) || 0;
+
+            // Base del impuesto de matriculación: valor de compra (o mayor de los dos si ITP)
+            let baseMat = valorCompra;
+            if (tipo === 'segunda_contrato') {
+                const valorHacienda = parseFloat(document.getElementById('mat-valor-hacienda').value) || 0;
+                baseMat = Math.max(valorCompra, valorHacienda);
+            }
+            document.getElementById('mat-base-mat').value  = baseMat > 0 ? baseMat.toFixed(2) : '';
+            document.getElementById('mat-cuota-mat').value = baseMat > 0 ? (baseMat * pctAplicar / 100).toFixed(2) : '';
+        }
+    }
+}
+
+function toggleSuplidoPerito() {
+    const checked = document.getElementById('mat-perito-necesario').checked;
+    document.getElementById('bloque-suplido-perito').style.display = checked ? 'block' : 'none';
+}
+
+// Leer todos los campos de matriculación para guardar en el expediente
+function leerCamposMatriculacion() {
+    return {
+        tipoAdquisicion:      document.getElementById('mat-tipo-adquisicion').value,
+        valorCompra:          document.getElementById('mat-valor-compra').value,
+        co2:                  document.getElementById('mat-co2').value,
+        exento:               document.getElementById('mat-exento').value,
+        // ITP
+        valorHacienda:        document.getElementById('mat-valor-hacienda').value,
+        baseItp:              document.getElementById('mat-base-itp').value,
+        porcentajeItp:        document.getElementById('mat-porcentaje-itp').value,
+        cuotaItp:             document.getElementById('mat-cuota-itp').value,
+        // Impuesto matriculación
+        porcentajeMatSugerido:document.getElementById('mat-porcentaje-mat').value,
+        porcentajeMatAplicado:document.getElementById('mat-porcentaje-mat-manual').value,
+        baseMat:              document.getElementById('mat-base-mat').value,
+        cuotaMat:             document.getElementById('mat-cuota-mat').value,
+        // Suplido IVTM
+        ivtmImporte:          document.getElementById('mat-ivtm-importe').value,
+        ivtmFechaFactura:     document.getElementById('mat-ivtm-fecha-factura').value,
+        ivtmPagado:           document.getElementById('mat-ivtm-pagado').value,
+        ivtmFechaPago:        document.getElementById('mat-ivtm-fecha-pago').value,
+        ivtmCobrado:          document.getElementById('mat-ivtm-cobrado').value,
+        // Suplido impuesto matriculación
+        supMatImporte:        document.getElementById('mat-sup-mat-importe').value,
+        supMatFechaFactura:   document.getElementById('mat-sup-mat-fecha-factura').value,
+        supMatPagado:         document.getElementById('mat-sup-mat-pagado').value,
+        supMatFechaPago:      document.getElementById('mat-sup-mat-fecha-pago').value,
+        supMatCobrado:        document.getElementById('mat-sup-mat-cobrado').value,
+        // Suplido Modelo 06
+        mod06Importe:         document.getElementById('mat-mod06-importe').value,
+        mod06FechaFactura:    document.getElementById('mat-mod06-fecha-factura').value,
+        mod06Pagado:          document.getElementById('mat-mod06-pagado').value,
+        mod06FechaPago:       document.getElementById('mat-mod06-fecha-pago').value,
+        mod06Cobrado:         document.getElementById('mat-mod06-cobrado').value,
+        // Suplido perito
+        peritoNecesario:      document.getElementById('mat-perito-necesario').checked,
+        peritoImporte:        document.getElementById('mat-perito-importe').value,
+        peritoFechaFactura:   document.getElementById('mat-perito-fecha-factura').value,
+        peritoPagado:         document.getElementById('mat-perito-pagado').value,
+        peritoFechaPago:      document.getElementById('mat-perito-fecha-pago').value,
+        peritoCobrado:        document.getElementById('mat-perito-cobrado').value,
     };
-    
-    localStorage.setItem('gestoria_tarifas', JSON.stringify(tarifas));
-    console.log('Tarifas guardadas:', tarifas);
 }
 
-// Cargar tarifas en la pestaña de configuración
-function cargarTarifasEnFormulario() {
-    const tarifas = cargarTarifas();
-    
-    // Transferencia
-    if (document.getElementById('tarifa-trf-tasa')) {
-        document.getElementById('tarifa-trf-tasa').value = tarifas.transferencia?.tasa || 65.23;
-        document.getElementById('tarifa-trf-honorarios').value = tarifas.transferencia?.honorarios || 70.00;
-    }
-    // Baja
-    if (document.getElementById('tarifa-baj-tasa')) {
-        document.getElementById('tarifa-baj-tasa').value = tarifas.baja?.tasa || 14.72;
-        document.getElementById('tarifa-baj-honorarios').value = tarifas.baja?.honorarios || 40.00;
-    }
-    // Duplicado
-    if (document.getElementById('tarifa-dup-tasa')) {
-        document.getElementById('tarifa-dup-tasa').value = tarifas.duplicado?.tasa || 23.23;
-        document.getElementById('tarifa-dup-honorarios').value = tarifas.duplicado?.honorarios || 40.00;
-    }
-    // Canje
-    if (document.getElementById('tarifa-cnj-tasa')) {
-        document.getElementById('tarifa-cnj-tasa').value = tarifas.canje?.tasa || 40.97;
-        document.getElementById('tarifa-cnj-honorarios').value = tarifas.canje?.honorarios || 200.00;
-    }
-    // Matriculación
-    if (document.getElementById('tarifa-mat-tasa')) {
-        document.getElementById('tarifa-mat-tasa').value = tarifas.matriculacion?.tasa || 109.33;
-        document.getElementById('tarifa-mat-impuesto').value = tarifas.matriculacion?.impuesto || 576.00;
-        document.getElementById('tarifa-mat-honorarios').value = tarifas.matriculacion?.honorarios || 150.00;
-    }
-    // VMP
-    if (document.getElementById('tarifa-vmp-tasa')) {
-        document.getElementById('tarifa-vmp-tasa').value = tarifas.vmp?.tasa || 15.00;
-        document.getElementById('tarifa-vmp-honorarios').value = tarifas.vmp?.honorarios || 35.00;
-    }
-    // Config
-    if (document.getElementById('config-iva')) {
-        document.getElementById('config-iva').value = tarifas.iva || 21;
-        document.getElementById('config-retencion').value = tarifas.retencion || 15;
-    }
+// Cargar campos de matriculación al editar un expediente existente
+function cargarCamposMatriculacion(datos) {
+    if (!datos) return;
+    const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.value = val || ''; };
+    const setChk = (id, val) => { const el = document.getElementById(id); if (el) el.checked = !!val; };
+
+    setVal('mat-tipo-adquisicion',      datos.tipoAdquisicion);
+    setVal('mat-valor-compra',          datos.valorCompra);
+    setVal('mat-co2',                   datos.co2);
+    setVal('mat-exento',                datos.exento);
+    setVal('mat-valor-hacienda',        datos.valorHacienda);
+    setVal('mat-porcentaje-itp',        datos.porcentajeItp || '4');
+    setVal('mat-porcentaje-mat-manual', datos.porcentajeMatAplicado);
+    // Suplidos
+    setVal('mat-ivtm-importe',          datos.ivtmImporte);
+    setVal('mat-ivtm-fecha-factura',    datos.ivtmFechaFactura);
+    setVal('mat-ivtm-pagado',           datos.ivtmPagado || 'no');
+    setVal('mat-ivtm-fecha-pago',       datos.ivtmFechaPago);
+    setVal('mat-ivtm-cobrado',          datos.ivtmCobrado);
+    setVal('mat-sup-mat-importe',       datos.supMatImporte);
+    setVal('mat-sup-mat-fecha-factura', datos.supMatFechaFactura);
+    setVal('mat-sup-mat-pagado',        datos.supMatPagado || 'no');
+    setVal('mat-sup-mat-fecha-pago',    datos.supMatFechaPago);
+    setVal('mat-sup-mat-cobrado',       datos.supMatCobrado);
+    setVal('mat-mod06-importe',         datos.mod06Importe);
+    setVal('mat-mod06-fecha-factura',   datos.mod06FechaFactura);
+    setVal('mat-mod06-pagado',          datos.mod06Pagado || 'no');
+    setVal('mat-mod06-fecha-pago',      datos.mod06FechaPago);
+    setVal('mat-mod06-cobrado',         datos.mod06Cobrado);
+    setChk('mat-perito-necesario',      datos.peritoNecesario);
+    setVal('mat-perito-importe',        datos.peritoImporte);
+    setVal('mat-perito-fecha-factura',  datos.peritoFechaFactura);
+    setVal('mat-perito-pagado',         datos.peritoPagado || 'no');
+    setVal('mat-perito-fecha-pago',     datos.peritoFechaPago);
+    setVal('mat-perito-cobrado',        datos.peritoCobrado);
+
+    // Actualizar visibilidad y cálculos
+    actualizarCamposMatriculacion();
+    toggleSuplidoPerito();
 }
-
-// Aplicar tarifas por defecto según el tipo de expediente
-function aplicarTarifasPorTipo(tipo) {
-    const tarifas = cargarTarifas();
-    const tarifa = tarifas[tipo];
-    
-    if (tarifa) {
-        document.getElementById('exp-tasa-trafico').value = tarifa.tasa.toFixed(2);
-        document.getElementById('exp-impuesto').value = tarifa.impuesto.toFixed(2);
-        document.getElementById('exp-honorarios').value = tarifa.honorarios.toFixed(2);
-        document.getElementById('exp-pago-cliente').value = '0.00';
-        calcularTotales();
-    }
-}
-
-// Calcular totales de la factura
-function calcularTotales() {
-    const tarifas = cargarTarifas();
-    const ivaPorc = tarifas.iva || 21;
-    const retencionPorc = tarifas.retencion || 15;
-    
-    const tasaTrafico = parseFloat(document.getElementById('exp-tasa-trafico').value) || 0;
-    const impuesto = parseFloat(document.getElementById('exp-impuesto').value) || 0;
-    const honorarios = parseFloat(document.getElementById('exp-honorarios').value) || 0;
-    const pagoCliente = parseFloat(document.getElementById('exp-pago-cliente').value) || 0;
-    const esEmpresa = document.getElementById('exp-es-empresa').checked;
-    
-    // Calcular IVA de honorarios
-    const ivaHonorarios = honorarios * (ivaPorc / 100);
-    document.getElementById('exp-iva-honorarios').value = ivaHonorarios.toFixed(2);
-    
-    // Total suplidos (sin IVA)
-    const totalSuplidos = tasaTrafico + impuesto;
-    document.getElementById('exp-total-suplidos').value = totalSuplidos.toFixed(2);
-    
-    // Total factura
-    let totalFactura = totalSuplidos + honorarios + ivaHonorarios;
-    
-    // Si es empresa, calcular retención
-    let retencion = 0;
-    if (esEmpresa) {
-        retencion = honorarios * (retencionPorc / 100);
-        document.getElementById('exp-retencion').value = retencion.toFixed(2);
-        document.getElementById('grupo-retencion').style.display = 'block';
-        totalFactura -= retencion;
-    } else {
-        document.getElementById('grupo-retencion').style.display = 'none';
-    }
-    
-    document.getElementById('exp-total-factura').value = totalFactura.toFixed(2);
-    
-    // DifHonorarios = Pago cliente - Total real (sin retención aplicada al cálculo)
-    const totalReal = totalSuplidos + honorarios + ivaHonorarios;
-    const difHonorarios = pagoCliente - totalReal;
-    document.getElementById('exp-dif-honorarios').value = difHonorarios.toFixed(2);
-    
-    // Colorear DifHonorarios según sea positivo o negativo
-    const difInput = document.getElementById('exp-dif-honorarios');
-    if (difHonorarios > 0) {
-        difInput.style.background = '#e8f5e9'; // Verde claro
-        difInput.style.color = '#2e7d32';
-    } else if (difHonorarios < 0) {
-        difInput.style.background = '#ffebee'; // Rojo claro
-        difInput.style.color = '#c62828';
-    } else {
-        difInput.style.background = '#fff3e0';
-        difInput.style.color = '#333';
-    }
-}
-
-// Modificar la función mostrarCamposExpediente para aplicar tarifas automáticamente
-const mostrarCamposExpedienteOriginal = mostrarCamposExpediente;
-mostrarCamposExpediente = function() {
-    mostrarCamposExpedienteOriginal();
-    const tipo = document.getElementById('expediente-tipo').value;
-    if (tipo) {
-        aplicarTarifasPorTipo(tipo);
-    }
-};
-
-// Cargar tarifas al iniciar
-document.addEventListener('DOMContentLoaded', function() {
-    cargarTarifasEnFormulario();
-});
