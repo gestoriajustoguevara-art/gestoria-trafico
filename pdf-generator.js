@@ -326,7 +326,7 @@ async function generarMandato(cliente, tipo, expediente, vehiculo) {
         // MANDANTE - Código Postal
         if (cliente.cp) {
             firstPage.drawText(toString(cliente.cp), {
-                x: 383,
+                x: 330,
                 y: height - 153,
                 size: fontSize - 1,
                 font: font,
