@@ -71,7 +71,12 @@ function switchTab(tabName) {
 function actualizarDashboard() {
     document.getElementById('total-clientes').textContent = clientes.length;
     document.getElementById('total-vehiculos').textContent = vehiculos.length;
-    document.getElementById('total-expedientes').textContent = expedientes.length;
+    
+    // Contar expedientes pendientes (no finalizados ni recogidos)
+    const expedientesPendientes = expedientes.filter(exp => 
+        exp.estado !== 'finalizado' && exp.estado !== 'recogido'
+    ).length;
+    document.getElementById('total-expedientes').textContent = expedientesPendientes;
     
     // Contar expedientes del mes actual
     const ahora = new Date();
@@ -124,12 +129,15 @@ function actualizarDashboard() {
             const vehiculo = vehiculos.find(v => v.id === exp.vehiculo);
             const matricula = vehiculo ? vehiculo.matricula : 'N/A';
             
+            // Obtener estado
+            const estadoInfo = obtenerEstiloEstado(exp.estado);
+            
             tr.innerHTML = `
                 <td><strong>${exp.numero}</strong></td>
                 <td><span class="expediente-badge ${badgeClass}">${exp.tipo.toUpperCase()}</span></td>
                 <td>${nombreCliente}</td>
                 <td>${matricula}</td>
-                <td>${formatearFecha(exp.fecha)}</td>
+                <td><span style="${estadoInfo.estilo}" onclick="cambiarEstadoExpediente('${exp.id}')">${estadoInfo.texto}</span></td>
                 <td>
                     <div class="action-buttons">
                         <button class="action-btn btn-primary" onclick="verExpediente('${exp.id}')">Ver</button>
@@ -222,18 +230,25 @@ function guardarCliente(event) {
         const index = clientes.findIndex(c => c.id === clienteEditandoId);
         if (index !== -1) {
             clientes[index] = cliente;
-            mostrarAlerta('✅ Cliente actualizado correctamente', 'success');
+            mostrarAlerta('✅ Cliente actualizado. Subiendo a Google Sheets...', 'success');
         }
         clienteEditandoId = null;
     } else {
         clientes.push(cliente);
-        mostrarAlerta('✅ Cliente guardado correctamente', 'success');
+        mostrarAlerta('✅ Cliente guardado. Subiendo a Google Sheets...', 'success');
     }
     
     guardarDatos();
     ocultarFormularioCliente();
     cargarTablaClientes();
     actualizarDashboard();
+    
+    // Subir automáticamente a Google Sheets
+    subirAGoogleSheets().then(() => {
+        console.log('✓ Clientes sincronizados con Google Sheets');
+    }).catch(err => {
+        console.error('Error al sincronizar clientes:', err);
+    });
 }
 
 // Función para mostrar/ocultar campos según el tipo de cliente
@@ -353,7 +368,14 @@ function eliminarCliente(id) {
         guardarDatos();
         cargarTablaClientes();
         actualizarDashboard();
-        mostrarAlerta('Cliente eliminado correctamente', 'success');
+        mostrarAlerta('Cliente eliminado. Sincronizando...', 'success');
+        
+        // Subir automáticamente a Google Sheets
+        subirAGoogleSheets().then(() => {
+            console.log('✓ Eliminación sincronizada con Google Sheets');
+        }).catch(err => {
+            console.error('Error al sincronizar eliminación:', err);
+        });
     }
 }
 
@@ -390,18 +412,25 @@ function guardarVehiculo(event) {
         const index = vehiculos.findIndex(v => v.id === vehiculoEditandoId);
         if (index !== -1) {
             vehiculos[index] = vehiculo;
-            mostrarAlerta('✅ Vehículo actualizado correctamente', 'success');
+            mostrarAlerta('✅ Vehículo actualizado. Subiendo a Google Sheets...', 'success');
         }
         vehiculoEditandoId = null;
     } else {
         vehiculos.push(vehiculo);
-        mostrarAlerta('✅ Vehículo guardado correctamente', 'success');
+        mostrarAlerta('✅ Vehículo guardado. Subiendo a Google Sheets...', 'success');
     }
     
     guardarDatos();
     ocultarFormularioVehiculo();
     cargarTablaVehiculos();
     actualizarDashboard();
+    
+    // Subir automáticamente a Google Sheets
+    subirAGoogleSheets().then(() => {
+        console.log('✓ Vehículos sincronizados con Google Sheets');
+    }).catch(err => {
+        console.error('Error al sincronizar vehículos:', err);
+    });
 }
 
 function cargarTablaVehiculos() {
@@ -477,7 +506,14 @@ function eliminarVehiculo(id) {
         guardarDatos();
         cargarTablaVehiculos();
         actualizarDashboard();
-        mostrarAlerta('Vehículo eliminado correctamente', 'success');
+        mostrarAlerta('Vehículo eliminado. Sincronizando...', 'success');
+        
+        // Subir automáticamente a Google Sheets
+        subirAGoogleSheets().then(() => {
+            console.log('✓ Eliminación sincronizada con Google Sheets');
+        }).catch(err => {
+            console.error('Error al sincronizar eliminación:', err);
+        });
     }
 }
 
@@ -491,8 +527,6 @@ function mostrarCamposExpediente() {
     document.getElementById('campos-matriculacion').style.display = 'none';
     document.getElementById('campos-baja').style.display = 'none';
     document.getElementById('campos-duplicado').style.display = 'none';
-    document.getElementById('campos-canje').style.display = 'none';
-    document.getElementById('campos-vmp').style.display = 'none';
     
     // Remover required de TODOS los campos del formulario
     document.querySelectorAll('#form-expediente [required]').forEach(el => el.removeAttribute('required'));
@@ -596,15 +630,11 @@ function guardarExpediente(event) {
         return;
     }
     
-    // Determinar si estamos editando o creando nuevo
-    const editandoId = window._expedienteEditandoId || null;
-    const expedienteExistente = editandoId ? expedientes.find(e => e.id === editandoId) : null;
-
     const expediente = {
-        id: editandoId || Date.now().toString(),
-        numero: expedienteExistente ? expedienteExistente.numero : generarNumeroExpediente(),
+        id: Date.now().toString(),
+        numero: generarNumeroExpediente(),
         tipo: tipo,
-        fecha: expedienteExistente ? expedienteExistente.fecha : (document.getElementById('exp-fecha') ? document.getElementById('exp-fecha').value || new Date().toISOString() : new Date().toISOString()),
+        fecha: new Date().toISOString(),
         observaciones: document.getElementById('exp-observaciones').value
     };
     
@@ -630,9 +660,6 @@ function guardarExpediente(event) {
             mostrarAlerta('Por favor, selecciona el titular y el vehículo', 'error');
             return;
         }
-        // Guardar todos los campos específicos de matriculación
-        const datosMatriculacion = leerCamposMatriculacion();
-        Object.assign(expediente, datosMatriculacion);
     } else if (tipo === 'baja') {
         expediente.vehiculo = document.getElementById('exp-vehiculo-baja').value;
         expediente.titular = document.getElementById('exp-titular-baja').value;
@@ -692,23 +719,22 @@ function guardarExpediente(event) {
     
     console.log('Expediente a guardar:', expediente);
     
-    if (editandoId) {
-        // Edición: reemplazar el expediente existente
-        const idx = expedientes.findIndex(e => e.id === editandoId);
-        if (idx !== -1) expedientes[idx] = expediente;
-        window._expedienteEditandoId = null;
-    } else {
-        expedientes.push(expediente);
-    }
+    expedientes.push(expediente);
     guardarDatos();
     
     console.log('Expediente guardado. Total expedientes:', expedientes.length);
     
-    const accion = editandoId ? 'actualizado' : 'creado';
-    mostrarAlerta(`✅ Expediente ${expediente.numero} ${accion} correctamente`, 'success');
+    mostrarAlerta(`✅ Expediente ${expediente.numero} creado correctamente. Subiendo a Google Sheets...`, 'success');
     limpiarFormularioExpediente();
     actualizarDashboard();
     cargarTablaExpedientes();
+    
+    // Subir automáticamente a Google Sheets
+    subirAGoogleSheets().then(() => {
+        console.log('✓ Datos sincronizados con Google Sheets');
+    }).catch(err => {
+        console.error('Error al sincronizar:', err);
+    });
     
     // Cambiar a la pestaña de expedientes después de 1 segundo
     setTimeout(() => {
@@ -793,17 +819,19 @@ function cargarTablaExpedientes() {
             matricula = vehiculo ? vehiculo.matricula : 'N/A';
         }
         
+        // Obtener estado con estilo
+        const estadoInfo = obtenerEstiloEstado(exp.estado);
+        
         tr.innerHTML = `
             <td><strong>${exp.numero}</strong></td>
             <td><span class="expediente-badge ${badgeClass}">${exp.tipo.toUpperCase()}</span></td>
             <td>${nombreCliente}</td>
             <td>${matricula}</td>
             <td>${formatearFecha(exp.fecha)}</td>
-            <td><span style="color: green;">✓ Activo</span></td>
+            <td><span style="${estadoInfo.estilo}" onclick="cambiarEstadoExpediente('${exp.id}')" title="Clic para cambiar estado">${estadoInfo.texto}</span></td>
             <td>
                 <div class="action-buttons">
                     <button class="action-btn btn-primary" onclick="verExpediente('${exp.id}')">Ver</button>
-                    <button class="action-btn" style="background:#f39c12;color:white;" onclick="modificarExpediente('${exp.id}')">✏️ Modificar</button>
                     <button class="action-btn btn-success" onclick="exportarAHermes('${exp.id}')">📤 Hermes</button>
                     <button class="action-btn btn-success" onclick="generarPDF('${exp.id}')">PDF</button>
                     <button class="action-btn btn-danger" onclick="eliminarExpediente('${exp.id}')">Eliminar</button>
@@ -882,13 +910,16 @@ function buscarExpedientes() {
             matricula = vehiculo ? vehiculo.matricula : 'N/A';
         }
         
+        // Obtener estado con estilo
+        const estadoInfo = obtenerEstiloEstado(exp.estado);
+        
         tr.innerHTML = `
             <td><strong>${exp.numero}</strong></td>
             <td><span class="expediente-badge ${badgeClass}">${exp.tipo.toUpperCase()}</span></td>
             <td>${nombreCliente}</td>
             <td>${matricula}</td>
             <td>${formatearFecha(exp.fecha)}</td>
-            <td><span style="color: green;">✓ Activo</span></td>
+            <td><span style="${estadoInfo.estilo}" onclick="cambiarEstadoExpediente('${exp.id}')" title="Clic para cambiar estado">${estadoInfo.texto}</span></td>
             <td>
                 <div class="action-buttons">
                     <button class="action-btn btn-primary" onclick="verExpediente('${exp.id}')">Ver</button>
@@ -932,75 +963,82 @@ function verExpediente(id) {
     alert(detalles);
 }
 
-function modificarExpediente(id) {
-    const expediente = expedientes.find(e => e.id === id);
-    if (!expediente) {
-        mostrarAlerta('Expediente no encontrado', 'error');
-        return;
-    }
-
-    // Ir a la pestaña de expedientes y mostrar formulario
-    mostrarTab('expedientes');
-    document.getElementById('formulario-expediente').style.display = 'block';
-
-    // Marcar que estamos editando
-    window._expedienteEditandoId = id;
-
-    // Rellenar campos comunes
-    document.getElementById('exp-tipo').value = expediente.tipo;
-    document.getElementById('exp-fecha').value = expediente.fecha || '';
-    document.getElementById('exp-observaciones').value = expediente.observaciones || '';
-
-    // Mostrar campos del tipo correspondiente
-    mostrarCamposExpediente();
-    cargarSelectsExpedientes();
-
-    // Rellenar campos específicos según tipo
-    setTimeout(() => {
-        if (expediente.tipo === 'matriculacion') {
-            document.getElementById('exp-titular-mat').value = expediente.titular || '';
-            document.getElementById('exp-vehiculo-mat').value = expediente.vehiculo || '';
-            cargarCamposMatriculacion(expediente);
-        } else if (expediente.tipo === 'transferencia') {
-            document.getElementById('exp-vendedor').value = expediente.vendedor || '';
-            document.getElementById('exp-comprador').value = expediente.comprador || '';
-            document.getElementById('exp-vehiculo').value = expediente.vehiculo || '';
-            document.getElementById('exp-precio').value = expediente.precio || '';
-            document.getElementById('exp-fecha-venta').value = expediente.fechaVenta || '';
-            document.getElementById('exp-hora-venta').value = expediente.horaVenta || '';
-            document.getElementById('exp-lugar-venta').value = expediente.lugarVenta || '';
-        } else if (expediente.tipo === 'baja') {
-            document.getElementById('exp-vehiculo-baja').value = expediente.vehiculo || '';
-            document.getElementById('exp-titular-baja').value = expediente.titular || '';
-            document.getElementById('exp-motivo-baja').value = expediente.motivoBaja || '';
-        } else if (expediente.tipo === 'duplicado') {
-            document.getElementById('exp-vehiculo-dup').value = expediente.vehiculo || '';
-            document.getElementById('exp-titular-dup').value = expediente.titular || '';
-            document.getElementById('exp-doc-duplicar').value = expediente.documentoDuplicar || '';
-        } else if (expediente.tipo === 'canje') {
-            document.getElementById('exp-titular-canje').value = expediente.titular || '';
-            document.getElementById('exp-canje-origen').value = expediente.origen || '';
-            document.getElementById('exp-canje-pais').value = expediente.pais || '';
-            document.getElementById('exp-canje-clase').value = expediente.clasePermiso || '';
-            document.getElementById('exp-canje-numero').value = expediente.numeroPermiso || '';
-            document.getElementById('exp-canje-fecha-exp').value = expediente.fechaExpedicion || '';
-            document.getElementById('exp-canje-fecha-cad').value = expediente.fechaCaducidad || '';
-            document.getElementById('exp-canje-localizador').value = expediente.localizadorDGT || '';
-            document.getElementById('exp-canje-colegio').value = expediente.recogerColegio || '';
-        }
-    }, 200); // pequeño delay para que los selects se hayan cargado
-
-    document.getElementById('formulario-expediente').scrollIntoView({ behavior: 'smooth' });
-    mostrarAlerta('Editando expediente: ' + expediente.numero, 'success');
-}
-
 function eliminarExpediente(id) {
     if (confirm('¿Estás seguro de que quieres eliminar este expediente?')) {
         expedientes = expedientes.filter(e => e.id !== id);
         guardarDatos();
         cargarTablaExpedientes();
         actualizarDashboard();
-        mostrarAlerta('Expediente eliminado correctamente', 'success');
+        mostrarAlerta('Expediente eliminado. Sincronizando...', 'success');
+        
+        // Subir automáticamente a Google Sheets
+        subirAGoogleSheets().then(() => {
+            console.log('✓ Eliminación sincronizada con Google Sheets');
+        }).catch(err => {
+            console.error('Error al sincronizar eliminación:', err);
+        });
+    }
+}
+
+// Lista de estados posibles para expedientes
+const ESTADOS_EXPEDIENTE = [
+    { valor: 'pendiente_doc', texto: '📋 Pendiente Doc', color: '#ff9800' },
+    { valor: 'enviado_ctit', texto: '📤 Enviado CTIT', color: '#2196f3' },
+    { valor: 'envio_pdf', texto: '📄 Envío PDF', color: '#9c27b0' },
+    { valor: 'remesado', texto: '💰 Remesado', color: '#00bcd4' },
+    { valor: 'finalizado', texto: '✅ Finalizado', color: '#4caf50' },
+    { valor: 'recogido', texto: '📦 Recogido', color: '#8bc34a' },
+    { valor: 'con_defectos', texto: '⚠️ Con Defectos', color: '#f44336' }
+];
+
+// Obtener estilo y texto del estado
+function obtenerEstiloEstado(estado) {
+    const estadoEncontrado = ESTADOS_EXPEDIENTE.find(e => e.valor === estado);
+    
+    if (estadoEncontrado) {
+        return {
+            texto: estadoEncontrado.texto,
+            estilo: `color: white; background-color: ${estadoEncontrado.color}; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 12px;`
+        };
+    }
+    
+    // Estado por defecto (pendiente_doc)
+    return {
+        texto: '📋 Pendiente Doc',
+        estilo: 'color: white; background-color: #ff9800; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 12px;'
+    };
+}
+
+// Cambiar estado de un expediente
+function cambiarEstadoExpediente(id) {
+    const expediente = expedientes.find(e => e.id === id);
+    if (!expediente) return;
+    
+    // Crear lista de opciones
+    let opciones = ESTADOS_EXPEDIENTE.map((e, i) => `${i + 1} - ${e.texto}`).join('\n');
+    
+    const seleccion = prompt(
+        `Cambiar estado del expediente ${expediente.numero}\n\nEstado actual: ${obtenerEstiloEstado(expediente.estado).texto}\n\nSelecciona nuevo estado:\n\n${opciones}\n\nEscribe el número:`
+    );
+    
+    if (seleccion) {
+        const indice = parseInt(seleccion) - 1;
+        if (indice >= 0 && indice < ESTADOS_EXPEDIENTE.length) {
+            expediente.estado = ESTADOS_EXPEDIENTE[indice].valor;
+            guardarDatos();
+            cargarTablaExpedientes();
+            actualizarDashboard();
+            mostrarAlerta(`Estado cambiado a: ${ESTADOS_EXPEDIENTE[indice].texto}`, 'success');
+            
+            // Subir automáticamente a Google Sheets
+            subirAGoogleSheets().then(() => {
+                console.log('✓ Estado sincronizado con Google Sheets');
+            }).catch(err => {
+                console.error('Error al sincronizar estado:', err);
+            });
+        } else {
+            mostrarAlerta('Opción no válida', 'error');
+        }
     }
 }
 
@@ -1626,31 +1664,8 @@ async function subirAGoogleSheets() {
         // MATRICULACIONES
         const matriculaciones = expedientes.filter(e => e.tipo === 'matriculacion');
         if (matriculaciones.length > 0) {
-            const matParaSheets = matriculaciones.map(exp => {
-                const titular = clientes.find(c => c.id == exp.titular);
-                const vehiculo = vehiculos.find(v => v.id == exp.vehiculo);
-                let nombreTitular = '';
-                if (titular) {
-                    nombreTitular = titular.tipoCliente === 'juridica'
-                        ? (titular.razonSocial || '')
-                        : ((titular.nombre || '') + ' ' + (titular.apellido1 || '')).trim();
-                }
-                return {
-                    ...exp,
-                    nombreTitular,
-                    matriculaVehiculo: vehiculo ? vehiculo.matricula : ''
-                };
-            });
-            await subirHoja('Matriculaciones', matParaSheets, [
-                'id', 'numero', 'fecha', 'titular', 'nombreTitular', 'vehiculo', 'matriculaVehiculo',
-                'tipoAdquisicion', 'valorCompra', 'co2', 'exento',
-                'valorHacienda', 'baseItp', 'porcentajeItp', 'cuotaItp',
-                'porcentajeMatSugerido', 'porcentajeMatAplicado', 'baseMat', 'cuotaMat',
-                'ivtmImporte', 'ivtmFechaFactura', 'ivtmPagado', 'ivtmFechaPago', 'ivtmCobrado',
-                'supMatImporte', 'supMatFechaFactura', 'supMatPagado', 'supMatFechaPago', 'supMatCobrado',
-                'mod06Importe', 'mod06FechaFactura', 'mod06Pagado', 'mod06FechaPago', 'mod06Cobrado',
-                'peritoNecesario', 'peritoImporte', 'peritoFechaFactura', 'peritoPagado', 'peritoFechaPago', 'peritoCobrado',
-                'observaciones'
+            await subirHoja('Matriculaciones', matriculaciones, [
+                'id', 'numero', 'fecha', 'titular', 'vehiculo', 'observaciones'
             ]);
         }
         
@@ -1950,189 +1965,4 @@ function mostrarMenuSync() {
     } else {
         menu.style.display = 'none';
     }
-}
-
-// ==================== MATRICULACIONES: LÓGICA DE CAMPOS ====================
-
-// Tramos CO2 para el impuesto de matriculación en Andalucía
-// Fuente: Ley reguladora del IEDMT (Impuesto Especial sobre Determinados Medios de Transporte)
-const TRAMOS_CO2_ANDALUCIA = [
-    { hasta: 0,   porcentaje: 0,    descripcion: 'Eléctrico puro (0 g/km) — Exento' },
-    { hasta: 120, porcentaje: 0,    descripcion: 'Hasta 120 g/km — Exento (puede variar)' },
-    { hasta: 160, porcentaje: 4.75, descripcion: '121–160 g/km — 4,75%' },
-    { hasta: 200, porcentaje: 9.75, descripcion: '161–200 g/km — 9,75%' },
-    { hasta: 999, porcentaje: 14.75,descripcion: 'Más de 200 g/km — 14,75%' },
-];
-
-function obtenerTramo(co2) {
-    if (co2 === '' || co2 === null || isNaN(co2)) return null;
-    const valor = parseFloat(co2);
-    if (valor <= 0) return TRAMOS_CO2_ANDALUCIA[0];
-    for (const tramo of TRAMOS_CO2_ANDALUCIA) {
-        if (valor <= tramo.hasta) return tramo;
-    }
-    return TRAMOS_CO2_ANDALUCIA[TRAMOS_CO2_ANDALUCIA.length - 1];
-}
-
-function actualizarCamposMatriculacion() {
-    const tipo = document.getElementById('mat-tipo-adquisicion').value;
-    const exento = document.getElementById('mat-exento').value;
-
-    // ITP: solo para 2ª mano sin factura
-    const bloqueItp = document.getElementById('bloque-itp');
-    bloqueItp.style.display = (tipo === 'segunda_contrato') ? 'block' : 'none';
-
-    // Bloque impuesto matriculación (ocultamos si exento)
-    const bloqueImpMat = document.getElementById('bloque-impuesto-mat');
-    const bloqueSup    = document.getElementById('bloque-suplido-mat');
-    if (exento === 'si') {
-        bloqueImpMat.style.display = 'none';
-        bloqueSup.style.display    = 'none';
-        document.getElementById('bloque-suplido-mod06').style.display = 'block';
-    } else {
-        bloqueImpMat.style.display = 'block';
-        bloqueSup.style.display    = 'block';
-        document.getElementById('bloque-suplido-mod06').style.display = 'none';
-    }
-
-    calcularMatriculacion();
-}
-
-function calcularMatriculacion() {
-    const tipo        = document.getElementById('mat-tipo-adquisicion').value;
-    const valorCompra = parseFloat(document.getElementById('mat-valor-compra').value) || 0;
-    const co2         = document.getElementById('mat-co2').value;
-    const exento      = document.getElementById('mat-exento').value;
-
-    // --- Base ITP (el mayor entre valor compra y valor Hacienda) ---
-    if (tipo === 'segunda_contrato') {
-        const valorHacienda = parseFloat(document.getElementById('mat-valor-hacienda').value) || 0;
-        const baseItp = Math.max(valorCompra, valorHacienda);
-        document.getElementById('mat-base-itp').value = baseItp > 0 ? baseItp.toFixed(2) : '';
-        const pctItp = parseFloat(document.getElementById('mat-porcentaje-itp').value) || 0;
-        document.getElementById('mat-cuota-itp').value = baseItp > 0 ? (baseItp * pctItp / 100).toFixed(2) : '';
-    }
-
-    // --- Impuesto de matriculación ---
-    if (exento !== 'si') {
-        const tramo = obtenerTramo(co2);
-        if (tramo) {
-            // Sugerir porcentaje pero no sobreescribir si el usuario ya lo tocó
-            const campoPct    = document.getElementById('mat-porcentaje-mat');
-            const campoManual = document.getElementById('mat-porcentaje-mat-manual');
-            const infoEl      = document.getElementById('mat-tramo-co2-info');
-
-            campoPct.value = tramo.porcentaje;
-            infoEl.textContent = '↳ ' + tramo.descripcion;
-
-            // Si el campo manual está vacío, llenarlo con el sugerido
-            if (campoManual.value === '' || campoManual.dataset.autoSet === 'true') {
-                campoManual.value = tramo.porcentaje;
-                campoManual.dataset.autoSet = 'true';
-            }
-
-            // Calcular cuota con el % manual (que el usuario puede rectificar)
-            const pctAplicar = parseFloat(campoManual.value) || 0;
-
-            // Base del impuesto de matriculación: valor de compra (o mayor de los dos si ITP)
-            let baseMat = valorCompra;
-            if (tipo === 'segunda_contrato') {
-                const valorHacienda = parseFloat(document.getElementById('mat-valor-hacienda').value) || 0;
-                baseMat = Math.max(valorCompra, valorHacienda);
-            }
-            document.getElementById('mat-base-mat').value  = baseMat > 0 ? baseMat.toFixed(2) : '';
-            document.getElementById('mat-cuota-mat').value = baseMat > 0 ? (baseMat * pctAplicar / 100).toFixed(2) : '';
-        }
-    }
-}
-
-function toggleSuplidoPerito() {
-    const checked = document.getElementById('mat-perito-necesario').checked;
-    document.getElementById('bloque-suplido-perito').style.display = checked ? 'block' : 'none';
-}
-
-// Leer todos los campos de matriculación para guardar en el expediente
-function leerCamposMatriculacion() {
-    return {
-        tipoAdquisicion:      document.getElementById('mat-tipo-adquisicion').value,
-        valorCompra:          document.getElementById('mat-valor-compra').value,
-        co2:                  document.getElementById('mat-co2').value,
-        exento:               document.getElementById('mat-exento').value,
-        // ITP
-        valorHacienda:        document.getElementById('mat-valor-hacienda').value,
-        baseItp:              document.getElementById('mat-base-itp').value,
-        porcentajeItp:        document.getElementById('mat-porcentaje-itp').value,
-        cuotaItp:             document.getElementById('mat-cuota-itp').value,
-        // Impuesto matriculación
-        porcentajeMatSugerido:document.getElementById('mat-porcentaje-mat').value,
-        porcentajeMatAplicado:document.getElementById('mat-porcentaje-mat-manual').value,
-        baseMat:              document.getElementById('mat-base-mat').value,
-        cuotaMat:             document.getElementById('mat-cuota-mat').value,
-        // Suplido IVTM
-        ivtmImporte:          document.getElementById('mat-ivtm-importe').value,
-        ivtmFechaFactura:     document.getElementById('mat-ivtm-fecha-factura').value,
-        ivtmPagado:           document.getElementById('mat-ivtm-pagado').value,
-        ivtmFechaPago:        document.getElementById('mat-ivtm-fecha-pago').value,
-        ivtmCobrado:          document.getElementById('mat-ivtm-cobrado').value,
-        // Suplido impuesto matriculación
-        supMatImporte:        document.getElementById('mat-sup-mat-importe').value,
-        supMatFechaFactura:   document.getElementById('mat-sup-mat-fecha-factura').value,
-        supMatPagado:         document.getElementById('mat-sup-mat-pagado').value,
-        supMatFechaPago:      document.getElementById('mat-sup-mat-fecha-pago').value,
-        supMatCobrado:        document.getElementById('mat-sup-mat-cobrado').value,
-        // Suplido Modelo 06
-        mod06Importe:         document.getElementById('mat-mod06-importe').value,
-        mod06FechaFactura:    document.getElementById('mat-mod06-fecha-factura').value,
-        mod06Pagado:          document.getElementById('mat-mod06-pagado').value,
-        mod06FechaPago:       document.getElementById('mat-mod06-fecha-pago').value,
-        mod06Cobrado:         document.getElementById('mat-mod06-cobrado').value,
-        // Suplido perito
-        peritoNecesario:      document.getElementById('mat-perito-necesario').checked,
-        peritoImporte:        document.getElementById('mat-perito-importe').value,
-        peritoFechaFactura:   document.getElementById('mat-perito-fecha-factura').value,
-        peritoPagado:         document.getElementById('mat-perito-pagado').value,
-        peritoFechaPago:      document.getElementById('mat-perito-fecha-pago').value,
-        peritoCobrado:        document.getElementById('mat-perito-cobrado').value,
-    };
-}
-
-// Cargar campos de matriculación al editar un expediente existente
-function cargarCamposMatriculacion(datos) {
-    if (!datos) return;
-    const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.value = val || ''; };
-    const setChk = (id, val) => { const el = document.getElementById(id); if (el) el.checked = !!val; };
-
-    setVal('mat-tipo-adquisicion',      datos.tipoAdquisicion);
-    setVal('mat-valor-compra',          datos.valorCompra);
-    setVal('mat-co2',                   datos.co2);
-    setVal('mat-exento',                datos.exento);
-    setVal('mat-valor-hacienda',        datos.valorHacienda);
-    setVal('mat-porcentaje-itp',        datos.porcentajeItp || '4');
-    setVal('mat-porcentaje-mat-manual', datos.porcentajeMatAplicado);
-    // Suplidos
-    setVal('mat-ivtm-importe',          datos.ivtmImporte);
-    setVal('mat-ivtm-fecha-factura',    datos.ivtmFechaFactura);
-    setVal('mat-ivtm-pagado',           datos.ivtmPagado || 'no');
-    setVal('mat-ivtm-fecha-pago',       datos.ivtmFechaPago);
-    setVal('mat-ivtm-cobrado',          datos.ivtmCobrado);
-    setVal('mat-sup-mat-importe',       datos.supMatImporte);
-    setVal('mat-sup-mat-fecha-factura', datos.supMatFechaFactura);
-    setVal('mat-sup-mat-pagado',        datos.supMatPagado || 'no');
-    setVal('mat-sup-mat-fecha-pago',    datos.supMatFechaPago);
-    setVal('mat-sup-mat-cobrado',       datos.supMatCobrado);
-    setVal('mat-mod06-importe',         datos.mod06Importe);
-    setVal('mat-mod06-fecha-factura',   datos.mod06FechaFactura);
-    setVal('mat-mod06-pagado',          datos.mod06Pagado || 'no');
-    setVal('mat-mod06-fecha-pago',      datos.mod06FechaPago);
-    setVal('mat-mod06-cobrado',         datos.mod06Cobrado);
-    setChk('mat-perito-necesario',      datos.peritoNecesario);
-    setVal('mat-perito-importe',        datos.peritoImporte);
-    setVal('mat-perito-fecha-factura',  datos.peritoFechaFactura);
-    setVal('mat-perito-pagado',         datos.peritoPagado || 'no');
-    setVal('mat-perito-fecha-pago',     datos.peritoFechaPago);
-    setVal('mat-perito-cobrado',        datos.peritoCobrado);
-
-    // Actualizar visibilidad y cálculos
-    actualizarCamposMatriculacion();
-    toggleSuplidoPerito();
 }
