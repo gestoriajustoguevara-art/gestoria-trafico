@@ -249,6 +249,31 @@ function guardarCliente(event) {
     }).catch(err => {
         console.error('Error al sincronizar clientes:', err);
     });
+
+    // ── ClientesMAESTRO ──────────────────────────────────────────────────
+    guardarEnMaestro({
+        DNI_NIE:    (cliente.nif||'').toUpperCase().replace(/-/g,''),
+        Nombre:     cliente.tipoCliente==='juridica' ? (cliente.nombre||'') : (cliente.nombre||''),
+        Apellido1:  cliente.tipoCliente==='juridica' ? '' : (cliente.apellido1||''),
+        Apellido2:  cliente.tipoCliente==='juridica' ? '' : (cliente.apellido2||''),
+        Fecha_Nacimiento: cliente.fechaNacimiento || '',
+        Telefono1:  cliente.telefono  || '',
+        Email:      cliente.email     || '',
+        Tipo_Via:   cliente.tipoVia   || '',
+        Nombre_Via: cliente.nombreVia || '',
+        Numero:     cliente.numero    || '',
+        CP:         cliente.cp        || '',
+        Municipio:  cliente.localidad || '',
+        Provincia:  cliente.codigoProvincia || '',
+        Codigo_INE: cliente.codigoMunicipio || '',
+        Tipo:       cliente.tipoCliente     || 'fisica',
+        Razon_Social: cliente.tipoCliente==='juridica' ? (cliente.nombre||'') : '',
+        CIF:          cliente.tipoCliente==='juridica' ? (cliente.nif||'')    : '',
+        Rep1_DNI:     cliente.dniRepresentante   || '',
+        Rep1_Nombre:  cliente.nombreRepresentante || '',
+        Rep1_Apellido1: cliente.apellido1Representante || '',
+        Rep1_Apellido2: cliente.apellido2Representante || ''
+    });
 }
 
 // Función para mostrar/ocultar campos según el tipo de cliente
@@ -1129,55 +1154,6 @@ function cambiarEstadoExpediente(id) {
         } else {
             mostrarAlerta('Opción no válida', 'error');
         }
-    }
-}
-
-// ════════════ VENCIMIENTOS CENTRALES — TRÁFICO ════════════
-const URL_VTO_TRA = 'https://script.google.com/macros/s/AKfycbzSpWjKLGxRp4CR4miJk4uP7b6CNmmToqGrleJXbEtQX9T6BdRyLkMReE5lBGxVk5i9SA/exec';
-
-function comprobarVtoTrafico(exp) {
-    const estadosCerrados = ['finalizado','recogido','entregado','cancelado'];
-    const cerrado = estadosCerrados.includes((exp.estado||'').toLowerCase());
-
-    if (cerrado) {
-        // Marcar como completado en el Sheets central
-        fetch(URL_VTO_TRA, { method:'POST', mode:'no-cors', body: JSON.stringify({
-            action:'completar', app:'Tráfico',
-            expediente: exp.numero, tipo: 'Expediente sin finalizar (+20d)'
-        })});
-        return;
-    }
-
-    // Calcular días desde la fecha de entrada
-    const fechaEntrada = exp.fecha ? new Date(exp.fecha) : null;
-    if (!fechaEntrada) return;
-    const hoy = new Date(); hoy.setHours(0,0,0,0);
-    const diasTranscurridos = Math.floor((hoy - fechaEntrada) / 86400000);
-
-    if (diasTranscurridos >= 20) {
-        // Calcular fecha en que cumplió los 20 días
-        const fecha20 = new Date(fechaEntrada);
-        fecha20.setDate(fecha20.getDate() + 20);
-        const fecha20ISO = fecha20.toISOString().slice(0,10);
-
-        // Obtener cliente del expediente
-        const clientes_data = JSON.parse(localStorage.getItem('clientes')||'[]');
-        let nombreCliente = '—';
-        const idCliente = exp.comprador || exp.titular;
-        if (idCliente) {
-            const cli = clientes_data.find(c => c.id === idCliente);
-            if (cli) nombreCliente = [cli.nombre, cli.apellido1, cli.apellido2].filter(Boolean).join(' ');
-        }
-
-        fetch(URL_VTO_TRA, { method:'POST', mode:'no-cors', body: JSON.stringify({
-            action:'upsert', app:'Tráfico',
-            expediente: exp.numero,
-            cliente: nombreCliente,
-            fecha: fecha20ISO,
-            tipo: 'Expediente sin finalizar (+20d)',
-            observaciones: exp.tipo || '',
-            estado: 'Pendiente'
-        })});
     }
 }
 
@@ -2342,3 +2318,110 @@ mostrarCamposExpediente = function() {
 document.addEventListener('DOMContentLoaded', function() {
     cargarTarifasEnFormulario();
 });
+
+
+// ═══ VENCIMIENTOS CENTRALES — TRÁFICO ════════════════════════════════════
+const URL_VTO_TRA = 'https://script.google.com/macros/s/AKfycbzSpWjKLGxRp4CR4miJk4uP7b6CNmmToqGrleJXbEtQX9T6BdRyLkMReE5lBGxVk5i9SA/exec';
+
+function comprobarVtoTrafico(exp) {
+    const estadosCerrados = ['finalizado', 'recogido', 'entregado', 'cancelado'];
+    const cerrado = estadosCerrados.includes((exp.estado || '').toLowerCase());
+
+    if (cerrado) {
+        fetch(URL_VTO_TRA, { method: 'POST', mode: 'no-cors', body: JSON.stringify({
+            action: 'completar', app: 'Tráfico',
+            expediente: exp.numero, tipo: 'Expediente sin finalizar (+20d)'
+        })});
+        return;
+    }
+
+    const fechaEntrada = exp.fecha ? new Date(exp.fecha) : null;
+    if (!fechaEntrada) return;
+    const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+    const diasTranscurridos = Math.floor((hoy - fechaEntrada) / 86400000);
+
+    if (diasTranscurridos >= 20) {
+        const fecha20 = new Date(fechaEntrada);
+        fecha20.setDate(fecha20.getDate() + 20);
+        const fecha20ISO = fecha20.toISOString().slice(0, 10);
+
+        // Obtener nombre del cliente
+        let nombreCliente = '—';
+        const idCliente = exp.comprador || exp.titular;
+        if (idCliente) {
+            const cli = clientes.find(c => c.id === idCliente);
+            if (cli) nombreCliente = [cli.nombre, cli.apellido1, cli.apellido2].filter(Boolean).join(' ');
+        }
+
+        fetch(URL_VTO_TRA, { method: 'POST', mode: 'no-cors', body: JSON.stringify({
+            action: 'upsert', app: 'Tráfico',
+            expediente: exp.numero,
+            cliente: nombreCliente,
+            fecha: fecha20ISO,
+            tipo: 'Expediente sin finalizar (+20d)',
+            observaciones: exp.tipo || '',
+            estado: 'Pendiente'
+        })});
+    }
+}
+
+// ═══ CLIENTESMAESTRO ══════════════════════════════════════════════════════
+const URL_MAESTRO = 'https://script.google.com/macros/s/AKfycbyVXypuTXm5tRvbP-xJu06q7ZsJ2qve790lCyvBLJpr6jTckZhc6wZ4kX5XPhVOWCVrww/exec';
+
+function guardarEnMaestro(datos) {
+    if (!datos.DNI_NIE || !datos.Nombre) return;
+    fetch(URL_MAESTRO, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action: 'upsert', datos }) });
+}
+
+async function buscarEnMaestro(dni) {
+    if (!dni || dni.length < 7) return null;
+    try {
+        const r = await fetch(URL_MAESTRO + '?action=buscar&dni=' + encodeURIComponent(dni.toUpperCase().replace(/-/g, '')));
+        const d = await r.json();
+        if (d && d.encontrado) return d.cliente;
+    } catch(e) {}
+    return null;
+}
+
+async function rellenarDesdeMaestroTRA() {
+    const nif = (document.getElementById('cliente-nif')?.value || document.getElementById('cliente-cif')?.value || '').trim();
+    if (!nif || nif.length < 7) { mostrarAlerta('Escribe el DNI/NIE/CIF primero', 'error'); return; }
+    mostrarAlerta('🔍 Buscando en ClientesMAESTRO...', 'success');
+    const cli = await buscarEnMaestro(nif);
+    if (!cli) { mostrarAlerta('❌ No encontrado en ClientesMAESTRO', 'error'); return; }
+    const set = (id, val) => { const el = document.getElementById(id); if (el && !el.value && val) el.value = val; };
+    // Persona física
+    set('cliente-nombre',    cli.Nombre    || '');
+    set('cliente-apellido1', cli.Apellido1 || '');
+    set('cliente-apellido2', cli.Apellido2 || '');
+    set('cliente-fecha-nacimiento', cli.Fecha_Nacimiento || '');
+    // Persona jurídica
+    set('cliente-razon-social', cli.Razon_Social || '');
+    set('cliente-cif',          cli.CIF || '');
+    set('cliente-dni-representante',   cli.Rep1_DNI      || '');
+    set('cliente-nombre-representante',cli.Rep1_Nombre   || '');
+    set('cliente-apellido1-representante', cli.Rep1_Apellido1 || '');
+    set('cliente-apellido2-representante', cli.Rep1_Apellido2 || '');
+    // Comunes
+    set('cliente-telefono',    cli.Telefono1 || '');
+    set('cliente-email',       cli.Email     || '');
+    set('cliente-tipo-via',    cli.Tipo_Via  || '');
+    set('cliente-nombre-via',  cli.Nombre_Via|| '');
+    set('cliente-numero',      cli.Numero    || '');
+    set('cliente-cp',          cli.CP        || '');
+    set('cliente-localidad',   cli.Municipio || '');
+    // Código municipio INE
+    if (cli.Codigo_INE) {
+        const sel = document.getElementById('cliente-codigo-municipio');
+        if (sel) {
+            const opt = [...sel.options].find(o => o.value === cli.Codigo_INE);
+            if (opt) sel.value = cli.Codigo_INE;
+        }
+    }
+    // Tipo de cliente
+    if (cli.Tipo) {
+        const sel = document.getElementById('cliente-tipo');
+        if (sel) { sel.value = cli.Tipo === 'juridica' ? 'juridica' : 'fisica'; cambiarTipoCliente(); }
+    }
+    mostrarAlerta('✅ Datos cargados desde ClientesMAESTRO', 'success');
+}
