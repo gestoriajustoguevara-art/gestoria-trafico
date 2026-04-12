@@ -512,9 +512,11 @@ async function subirAGoogleSheets() {
             const v = clientes.find(c => c.id == idVend);
             const nomVend = v ? (v.tipoCliente==='juridica' ? v.razonSocial||'' : `${v.nombre||''} ${v.apellido1||''} ${v.apellido2||''}`.trim()) : '';
             const veh = vehiculos.find(v => v.id == exp.vehiculo);
-            return { ...exp, vendedor:idVend, comprador:idCli, vehiculo:exp.vehiculo||'', nombreVendedor:nomVend, nombreComprador:nomCli, matriculaVehiculo:veh?veh.matricula:'' };
+            const dniComp = c ? (c.nif||'') : '';
+            const dniVend = v ? (v.nif||'') : '';
+            return { ...exp, vendedor:idVend, comprador:idCli, vehiculo:exp.vehiculo||'', nombreVendedor:nomVend, nombreComprador:nomCli, matriculaVehiculo:veh?veh.matricula:'', dniComprador:dniComp, dniVendedor:dniVend };
         });
-        await subirHoja('Expedientes', expsSheets, ['id','numero','fecha','tipo','estado','estadoFactura','vendedor','nombreVendedor','comprador','nombreComprador','vehiculo','matriculaVehiculo','precio','observaciones','tasaTrafico','impuesto','honorarios','ivaHonorarios','totalSuplidos','totalFactura','pagoCliente','difHonorarios','esEmpresa','retencion']);
+        await subirHoja('Expedientes', expsSheets, ['id','numero','fecha','tipo','estado','estadoFactura','vendedor','nombreVendedor','dniVendedor','comprador','nombreComprador','dniComprador','vehiculo','matriculaVehiculo','precio','observaciones','tasaTrafico','impuesto','honorarios','ivaHonorarios','totalSuplidos','totalFactura','pagoCliente','difHonorarios','esEmpresa','retencion']);
         mostrarAlerta('✅ Datos subidos correctamente', 'success');
     } catch(e) { console.error(e); mostrarAlerta('❌ Error: '+e.message, 'error'); }
 }
