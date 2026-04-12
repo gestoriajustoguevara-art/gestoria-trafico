@@ -152,6 +152,7 @@ function actualizarDashboard() {
                 <td>${nombreCliente}</td>
                 <td>${matricula}</td>
                 <td><span style="${estadoInfo.estilo}" onclick="cambiarEstadoExpediente('${exp.id}')">${estadoInfo.texto}</span></td>
+                <td>${estadoFacturaBadge(exp.estadoFactura)}</td>
                 <td>
                     <div class="action-buttons">
                         <button class="action-btn btn-primary" onclick="verExpediente('${exp.id}')">Ver</button>
