@@ -1301,9 +1301,14 @@
                     </div>
                 </div>
 
-                <div class="form-group" style="margin-top: 30px;">
-                    <label>Observaciones</label>
-                    <textarea id="exp-observaciones" rows="4" placeholder="Notas adicionales sobre el expediente..."></textarea>
+                <div class="form-group" style="margin-top: 20px;">
+                    <label>Estado de facturación</label>
+                    <select id="exp-estado-factura">
+                        <option value="pendiente">⏳ Pendiente</option>
+                        <option value="listo">🔵 Listo para facturar</option>
+                        <option value="facturado">📋 Facturado</option>
+                        <option value="nf">🚫 No facturar</option>
+                    </select>
                 </div>
 
                 <div style="margin-top: 30px;">
