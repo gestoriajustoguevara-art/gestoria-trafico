@@ -620,7 +620,8 @@ function guardarExpediente(event) {
         totalFactura: parseFloat(document.getElementById('exp-total-factura').value) || 0,
         difHonorarios: parseFloat(document.getElementById('exp-dif-honorarios').value) || 0,
         esEmpresa: document.getElementById('exp-es-empresa').checked,
-        retencion: parseFloat(document.getElementById('exp-retencion').value) || 0
+        retencion: parseFloat(document.getElementById('exp-retencion').value) || 0,
+        estadoFactura: document.getElementById('exp-estado-factura').value || 'pendiente'
     };
     
     if (tipo === 'transferencia') {
