@@ -1485,3 +1485,9 @@ async function rellenarDesdeMaestroTRA() {
     }
     mostrarAlerta('✅ Datos cargados desde ClientesMAESTRO', 'success');
 }
+function estadoFacturaBadge(ef) {
+    if (ef === 'facturado') return '<span style="background:#dcfce7;color:#166534;padding:3px 8px;border-radius:10px;font-size:11px;font-weight:700">📋 Facturado</span>';
+    if (ef === 'listo') return '<span style="background:#ede9fe;color:#6d28d9;padding:3px 8px;border-radius:10px;font-size:11px;font-weight:700">🔵 Listo</span>';
+    if (ef === 'nf') return '<span style="background:#fee2e2;color:#991b1b;padding:3px 8px;border-radius:10px;font-size:11px;font-weight:700">🚫 NF</span>';
+    return '<span style="background:#fef3c7;color:#92400e;padding:3px 8px;border-radius:10px;font-size:11px;font-weight:700">⏳ Pendiente</span>';
+}
