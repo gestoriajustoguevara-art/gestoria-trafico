@@ -21,12 +21,13 @@ async function cargarConfigTrafico() {
 
 window.onload = async function() {
     await cargarConfigTrafico();
-    cargarDatos();
+    cargarDatos();          // carga localStorage como fallback mientras descarga
     actualizarDashboard();
     cargarTablaClientes();
     cargarTablaVehiculos();
     cargarTablaExpedientes();
     cargarSelectsExpedientes();
+    await descargarDeGoogleSheets();  // siempre sincroniza desde Sheets al arrancar
 };
 
 function cargarDatos() {
@@ -187,7 +188,7 @@ function buscarVehiculos() {
     tbody.innerHTML = '';
     const res = vehiculos.filter(v => v.matricula.toLowerCase().includes(q) || v.marca.toLowerCase().includes(q) || (v.bastidor && v.bastidor.toLowerCase().includes(q)));
     if (!res.length) { tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:40px">No se encontraron vehículos</td></tr>'; return; }
-    res.forEach(v => { const tr = document.createElement('tr'); tr.innerHTML = `<td><strong>${v.matricula}</strong></td><td>${v.marca} ${v.modelo||''}</td><td>${v.bastidor||'-'}</td><td>${v.kilometros ? v.kilometros+' km' : '-'}</td><td>${v.servicio||'-'}</td><td><div class="action-buttons"><button class="action-btn btn-primary" onclick="editarVehiculo('${v.id}')">Editar</button><button class="action-btn btn-danger" onclick="eliminarVehiculo('${v.id}')">Eliminar</button></div></td>`; tbody.appendChild(tr); });
+    res.forEach(v => { const tr = document.createElement('tr'); tr.innerHTML = `<td><strong>${v.matricula}</strong></td><td>${v.marca} ${v.modelo||''}</td><td>${v.bastidor||'-'}</td><td>${v.kilometros ? v.kilometulos+' km' : '-'}</td><td>${v.servicio||'-'}</td><td><div class="action-buttons"><button class="action-btn btn-primary" onclick="editarVehiculo('${v.id}')">Editar</button><button class="action-btn btn-danger" onclick="eliminarVehiculo('${v.id}')">Eliminar</button></div></td>`; tbody.appendChild(tr); });
 }
 
 function eliminarVehiculo(id) { if (confirm('¿Eliminar este vehículo?')) { vehiculos = vehiculos.filter(v => v.id !== id); guardarDatos(); cargarTablaVehiculos(); actualizarDashboard(); mostrarAlerta('Vehículo eliminado.', 'success'); subirAGoogleSheets().catch(console.error); } }
@@ -531,15 +532,15 @@ async function subirHoja(nombreHoja, datos, columnas) {
 
 async function descargarDeGoogleSheets() {
     if (!GOOGLE_SHEETS_URL) { mostrarAlerta('Config central no cargada', 'error'); return; }
-    mostrarAlerta('⏳ Descargando...', 'success');
+    mostrarAlerta('⏳ Sincronizando con Sheets...', 'success');
     try {
         const toStr = arr => arr.map(obj => { const o={}; for(const k in obj)o[k]=(obj[k]===null||obj[k]===undefined||obj[k]==='')? '':String(obj[k]); return o; });
         const c = await descargarHoja('Clientes'); if(c&&c.length) clientes=toStr(c);
         const v = await descargarHoja('Vehiculos'); if(v&&v.length) vehiculos=toStr(v);
         const e = await descargarHoja('Expedientes'); if(e&&e.length) expedientes=toStr(e);
         guardarDatos(); actualizarDashboard(); cargarTablaClientes(); cargarTablaVehiculos(); cargarTablaExpedientes(); cargarSelectsExpedientes();
-        mostrarAlerta('✅ Datos descargados', 'success');
-    } catch(e) { mostrarAlerta('❌ Error: '+e.message, 'error'); }
+        mostrarAlerta('✅ Datos sincronizados desde Sheets', 'success');
+    } catch(e) { mostrarAlerta('⚠️ Sin conexión a Sheets — usando datos locales', 'error'); }
 }
 
 async function descargarHoja(nombreHoja) {
